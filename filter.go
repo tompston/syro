@@ -8,6 +8,13 @@ import (
 	"time"
 )
 
+type TimeseriesFilter struct {
+	From  time.Time
+	To    time.Time
+	Limit int64
+	Skip  int64
+}
+
 // Struct for grouping up / exposing query functions that use the interfaces
 type query struct {
 	Logs           func(l Logger, maxLimit int64, urlPath string) ([]Log, error)
@@ -23,35 +30,28 @@ func Query() query {
 	}
 }
 
-type TimeseriesFilter struct {
-	From  time.Time
-	To    time.Time
-	Limit int64
-	Skip  int64
-}
-
 // parse the to, from, limit and skip parameters from the URL, if they exist and are valid values.
 func parseUrlToTimeseriesParams(vals url.Values) (*TimeseriesFilter, error) {
 	filter := TimeseriesFilter{}
 
 	// Parse "from" time
 	if from := vals.Get("from"); from != "" {
-		parsedFrom, err := time.Parse(time.RFC3339, from)
+		_time, err := time.Parse(time.RFC3339, from)
 		if err != nil {
 			return nil, fmt.Errorf("invalid 'from' time format: %v", err)
 		}
 
-		filter.From = parsedFrom
+		filter.From = _time
 	}
 
 	// Parse "to" time
 	if to := vals.Get("to"); to != "" {
-		parsedTo, err := time.Parse(time.RFC3339, to)
+		_time, err := time.Parse(time.RFC3339, to)
 		if err != nil {
 			return nil, fmt.Errorf("invalid 'to' time format: %v", err)
 		}
 
-		filter.To = parsedTo
+		filter.To = _time
 	}
 
 	// Parse "limit"

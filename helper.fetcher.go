@@ -9,6 +9,9 @@ import (
 	"net/http"
 )
 
+// TODO: test this
+// NOTE: util method which can generate a curl request for easier sharing of requests
+// NOTE: maybe rename this to Fetch or Curl ?
 type Request struct {
 	Method            string
 	URL               string
@@ -107,13 +110,7 @@ func (r *Request) Fetch() (*Response, error) {
 	if res.StatusCode != 200 && res.StatusCode != 201 && res.StatusCode != 202 {
 		bodyStr := ""
 		if body != nil {
-			bodyUpTo := len(body)
-			if bodyUpTo > 1000 {
-				bodyUpTo = 1000 // limit to 1000 characters
-			}
-
-			// checked, if body contains wrong char codes, code will still work
-			// if body is nil it will work too
+			bodyUpTo := min(len(body), 1000) // limit to 1000 characters
 			bodyStr = string(body[:bodyUpTo])
 		}
 
