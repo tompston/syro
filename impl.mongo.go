@@ -26,7 +26,7 @@ func NewMongoLogger(coll *mongo.Collection, settings *LoggerSettings) *MongoLogg
 
 func (lg *MongoLogger) CreateIndexes() error {
 	return newMongoIndexes().
-		Add("timestamp", "level").
+		Add("ts", "level").
 		Add("source", "event").
 		Add("event_id").
 		Create(lg.Coll)
@@ -72,9 +72,9 @@ func (lg *MongoLogger) log(level LogLevel, msg string, lf ...LogFields) error {
 	// the field has a string type.
 
 	set := bson.M{
-		"timestamp": log.Timestamp,
-		"level":     log.Level,
-		"message":   log.Message,
+		"ts":      log.Timestamp,
+		"level":   log.Level,
+		"message": log.Message,
 	}
 
 	if log.Source != "" {
@@ -132,7 +132,7 @@ func (lg *MongoLogger) FindLogs(filter LogFilter, maxLimit int64) ([]Log, error)
 			return nil, errors.New("'from' date cannot be after 'to' date")
 		}
 
-		queryFilter["timestamp"] = bson.M{"$gte": filter.From, "$lte": filter.To}
+		queryFilter["ts"] = bson.M{"$gte": filter.From, "$lte": filter.To}
 	}
 
 	level := filter.Level
@@ -158,7 +158,7 @@ func (lg *MongoLogger) FindLogs(filter LogFilter, maxLimit int64) ([]Log, error)
 	}
 
 	opts := options.Find().
-		SetSort(bson.D{{Key: "timestamp", Value: -1}}). // sort by time field in descending order
+		SetSort(bson.D{{Key: "ts", Value: -1}}). // sort by time field in descending order
 		SetLimit(userLimit).
 		SetSkip(filter.TimeseriesFilter.Skip)
 

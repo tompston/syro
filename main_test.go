@@ -30,7 +30,7 @@ func TestLogger(t *testing.T) {
 		// parse the created_at field from the json string and check it the time is
 		// within the last 2 seconds
 		type parsed struct {
-			CreatedAt time.Time `json:"timestamp" bson:"timestamp"`
+			CreatedAt time.Time `json:"ts" bson:"ts"`
 		}
 
 		t.Run("test-json-unmarshalling", func(t *testing.T) {
@@ -40,7 +40,7 @@ func TestLogger(t *testing.T) {
 				`"source":"my-source"`,
 				`"event":"my-event"`,
 				`"event_id":"my-event-id"`,
-				`"timestamp":`,
+				`"ts":`,
 			}); err != nil {
 				t.Fatal(err)
 			}
@@ -155,11 +155,9 @@ func TestErrGroup(t *testing.T) {
 
 	t.Run("test-errors", func(t *testing.T) {
 		eg := NewErrGroup()
-		err1 := errors.New("first error")
-		err2 := errors.New("second error")
 
-		eg.Add(err1)
-		eg.Add(err2)
+		eg.Add(errors.New("first error"))
+		eg.Add(errors.New("second error"))
 
 		expected := "first error; second error"
 		if eg.Error() != expected {

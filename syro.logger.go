@@ -25,7 +25,7 @@ type Logger interface {
 }
 
 type Log struct {
-	Timestamp time.Time `json:"timestamp" bson:"timestamp"`                   // Time of the log (UTC)
+	Timestamp time.Time `json:"ts" bson:"ts"`                                 // Time of the log (UTC)
 	ID        string    `json:"_id" bson:"_id"`                               // (not logged to the console)
 	Message   string    `json:"message" bson:"message"`                       // Logged message
 	Source    string    `json:"source,omitempty" bson:"source,omitempty"`     // Source of the log (api, pooler, etc.)
@@ -58,9 +58,9 @@ type LoggerSettings struct {
 
 const defaultTimeFormat = "2006-01-02 15:04:05"
 
-// DefaultLoggerSettings are the default settings for the logger, used if the
+// LoggerSettingsDefault are the default settings for the logger, used if the
 // settings are not provided or location is nil.
-var DefaultLoggerSettings = &LoggerSettings{
+var LoggerSettingsDefault = &LoggerSettings{
 	Location:   time.UTC,
 	TimeFormat: defaultTimeFormat,
 	// TODO: optional disable for console?
@@ -113,7 +113,7 @@ func NewLog(level LogLevel, msg, source, event, eventID string, fields ...LogFie
 // String method converts the log to a string, using the provided logger settings.
 func (log Log) String(logger Logger) string {
 	// Use the default settings by default if the settings are not correct
-	settings := DefaultLoggerSettings
+	settings := LoggerSettingsDefault
 
 	// if the logger is not nil and has it has settings with a defined location, use them
 	if logger != nil {

@@ -60,14 +60,18 @@ func (eg *ErrGroup) Error() string {
 		sb.WriteString(": ")
 	}
 
+	// Track whether we’ve written any errors (for semicolon separation)
+	first := true
 	for _, err := range eg.Errors {
 		if err != nil {
-			sb.WriteString(err.Error())
-			sb.WriteString("; ")
-
-			if propsExist && eg.Props.WithNewline {
-				sb.WriteString("\n")
+			if !first {
+				sb.WriteString("; ")
+				if propsExist && eg.Props.WithNewline {
+					sb.WriteString("\n")
+				}
 			}
+			sb.WriteString(err.Error())
+			first = false
 		}
 	}
 
