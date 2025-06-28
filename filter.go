@@ -8,16 +8,19 @@ import (
 	"time"
 )
 
+// Struct for grouping up / exposing query functions that use the interfaces
 type query struct {
 	Logs           func(l Logger, maxLimit int64, urlPath string) ([]Log, error)
 	Crons          func(s CronStorage, urlPath string) ([]CronJob, error)
 	CronExecutions func(s CronStorage, urlPath string) ([]CronExecLog, error)
 }
 
-var Query = query{
-	Logs:           QueryLogs,
-	Crons:          QueryCrons,
-	CronExecutions: QueryCronExecutions,
+func Query() query {
+	return query{
+		Logs:           queryLogs,
+		Crons:          queryCrons,
+		CronExecutions: queryCronExecutions,
+	}
 }
 
 type TimeseriesFilter struct {
@@ -74,7 +77,7 @@ func parseUrlToTimeseriesParams(vals url.Values) (*TimeseriesFilter, error) {
 	return &filter, nil
 }
 
-func QueryLogs(l Logger, maxLimit int64, urlPath string) ([]Log, error) {
+func queryLogs(l Logger, maxLimit int64, urlPath string) ([]Log, error) {
 	if l == nil {
 		return nil, errors.New("logger is nil")
 	}
@@ -106,7 +109,7 @@ func QueryLogs(l Logger, maxLimit int64, urlPath string) ([]Log, error) {
 	return l.FindLogs(filter, maxLimit)
 }
 
-func QueryCrons(s CronStorage, urlPath string) ([]CronJob, error) {
+func queryCrons(s CronStorage, urlPath string) ([]CronJob, error) {
 	if s == nil {
 		return nil, errors.New("storage is nil")
 	}
@@ -114,7 +117,7 @@ func QueryCrons(s CronStorage, urlPath string) ([]CronJob, error) {
 	return s.FindCronJobs()
 }
 
-func QueryCronExecutions(s CronStorage, urlPath string) ([]CronExecLog, error) {
+func queryCronExecutions(s CronStorage, urlPath string) ([]CronExecLog, error) {
 	if s == nil {
 		return nil, errors.New("storage is nil")
 	}
