@@ -1,10 +1,13 @@
 package syro
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -510,4 +513,94 @@ func TestJobLocker(t *testing.T) {
 			t.Fatalf("Expected job function to run once, but it ran %d times", counter)
 		}
 	})
+}
+
+func TestRequest(t *testing.T) {
+
+	t.Run("with-headers-and-body", func(t *testing.T) {
+		req := NewRequest("POST", "http://example.com").
+			WithHeaders(map[string]string{"X-Test": "123"}).
+			WithHeader("Content-Type", "application/json").
+			WithBody([]byte(`{"a":1}`))
+
+		if req.Headers["X-Test"] != "123" || req.Headers["Content-Type"] != "application/json" {
+			t.Errorf("headers not set correctly: %+v", req.Headers)
+		}
+		if !bytes.Equal(req.Body, []byte(`{"a":1}`)) {
+			t.Errorf("body mismatch: %s", string(req.Body))
+		}
+	})
+
+	t.Run("with-ignore-status-codes", func(t *testing.T) {
+		req := NewRequest("GET", "http://example.com").WithIgnoreStatusCodes(true)
+		if !req.IgnoreStatusCodes {
+			t.Error("expected IgnoreStatusCodes to be true")
+		}
+
+		res, err := req.Fetch()
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if res.StatusCode != 200 {
+			t.Errorf("expected status code 200, got %d", res.StatusCode)
+		}
+
+		fmt.Printf("res.Body: %v\n", string(res.Body))
+	})
+
+	t.Run("fetch-missing-method-or-url", func(t *testing.T) {
+		req := NewRequest("", "")
+		_, err := req.Fetch()
+		if err == nil || err.Error() != "request method is not set" {
+			t.Errorf("expected error on missing method, got: %v", err)
+		}
+
+		req = NewRequest("GET", "")
+		_, err = req.Fetch()
+		if err == nil || err.Error() != "request URL is not set" {
+			t.Errorf("expected error on missing URL, got: %v", err)
+		}
+	})
+
+	t.Run("fetch-success", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("hello world"))
+		}))
+		defer server.Close()
+
+		fmt.Printf("server.URL: %v\n", server.URL)
+
+		req := NewRequest("GET", server.URL)
+		res, err := req.Fetch()
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if string(res.Body) != "hello world" {
+			t.Errorf("unexpected body: %s", res.Body)
+		}
+
+		if res.StatusCode != http.StatusOK {
+			t.Errorf("expected status code 200, got %d", res.StatusCode)
+		}
+	})
+
+	t.Run("fetch-rejects-non-200", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.Error(w, "fail", http.StatusTeapot)
+		}))
+		defer server.Close()
+
+		req := NewRequest("GET", server.URL)
+
+		_, err := req.Fetch()
+		if err == nil || !contains(err.Error(), "status: 418") {
+			t.Errorf("expected status error, got: %v", err)
+		}
+	})
+}
+
+func contains(s, substr string) bool {
+	return bytes.Contains([]byte(s), []byte(substr))
 }

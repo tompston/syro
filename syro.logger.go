@@ -7,6 +7,7 @@ import (
 )
 
 type Logger interface {
+	Log(level LogLevel, msg string, lf ...LogFields) error // Log method to log a message with a specific level and optional fields
 	Error(msg string, lf ...LogFields) error
 	Info(msg string, lf ...LogFields) error
 	Debug(msg string, lf ...LogFields) error
@@ -48,6 +49,8 @@ const (
 	ERROR LogLevel = 5
 	FATAL LogLevel = 6
 )
+
+var LogLevels = []LogLevel{TRACE, DEBUG, INFO, WARN, ERROR, FATAL}
 
 // LoggerSettings struct for storing the settings for the logger which are
 // used when printing the log to the console.
@@ -188,7 +191,7 @@ func (lg *ConsoleLogger) Name() string { return "console" }
 
 func (lg *ConsoleLogger) GetTableName() string { return "" }
 
-func (lg *ConsoleLogger) log(level LogLevel, msg string, lf ...LogFields) error {
+func (lg *ConsoleLogger) Log(level LogLevel, msg string, lf ...LogFields) error {
 	log := NewLog(level, msg, lg.Source, lg.Event, lg.EventID, lf...)
 	_, err := fmt.Print(log.String(lg))
 	return err
@@ -209,12 +212,12 @@ func (lg *ConsoleLogger) WithEventID(v string) Logger {
 	return lg
 }
 
-func (lg *ConsoleLogger) Debug(msg string, lf ...LogFields) error { return lg.log(DEBUG, msg, lf...) }
-func (lg *ConsoleLogger) Trace(msg string, lf ...LogFields) error { return lg.log(TRACE, msg, lf...) }
-func (lg *ConsoleLogger) Error(msg string, lf ...LogFields) error { return lg.log(ERROR, msg, lf...) }
-func (lg *ConsoleLogger) Info(msg string, lf ...LogFields) error  { return lg.log(INFO, msg, lf...) }
-func (lg *ConsoleLogger) Warn(msg string, lf ...LogFields) error  { return lg.log(WARN, msg, lf...) }
-func (lg *ConsoleLogger) Fatal(msg string, lf ...LogFields) error { return lg.log(FATAL, msg, lf...) }
+func (lg *ConsoleLogger) Debug(msg string, lf ...LogFields) error { return lg.Log(DEBUG, msg, lf...) }
+func (lg *ConsoleLogger) Trace(msg string, lf ...LogFields) error { return lg.Log(TRACE, msg, lf...) }
+func (lg *ConsoleLogger) Error(msg string, lf ...LogFields) error { return lg.Log(ERROR, msg, lf...) }
+func (lg *ConsoleLogger) Info(msg string, lf ...LogFields) error  { return lg.Log(INFO, msg, lf...) }
+func (lg *ConsoleLogger) Warn(msg string, lf ...LogFields) error  { return lg.Log(WARN, msg, lf...) }
+func (lg *ConsoleLogger) Fatal(msg string, lf ...LogFields) error { return lg.Log(FATAL, msg, lf...) }
 
 func (lg *ConsoleLogger) LogExists(filter any) (bool, error) {
 	return false, fmt.Errorf("method cannot be used with ConsoleLogger")

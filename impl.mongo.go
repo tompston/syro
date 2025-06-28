@@ -64,7 +64,7 @@ func (lg *MongoLogger) WithEventID(v string) Logger {
 	return lg
 }
 
-func (lg *MongoLogger) log(level LogLevel, msg string, lf ...LogFields) error {
+func (lg *MongoLogger) Log(level LogLevel, msg string, lf ...LogFields) error {
 	log := NewLog(level, msg, lg.Source, lg.Event, lg.EventID, lf...)
 
 	// a custom set is defined because just using an InsertOne on the log
@@ -114,12 +114,12 @@ func (lg *MongoLogger) LogExists(filter any) (bool, error) {
 	return !log.Timestamp.IsZero(), nil
 }
 
-func (lg *MongoLogger) Debug(msg string, lf ...LogFields) error { return lg.log(DEBUG, msg, lf...) }
-func (lg *MongoLogger) Trace(msg string, lf ...LogFields) error { return lg.log(TRACE, msg, lf...) }
-func (lg *MongoLogger) Error(msg string, lf ...LogFields) error { return lg.log(ERROR, msg, lf...) }
-func (lg *MongoLogger) Info(msg string, lf ...LogFields) error  { return lg.log(INFO, msg, lf...) }
-func (lg *MongoLogger) Warn(msg string, lf ...LogFields) error  { return lg.log(WARN, msg, lf...) }
-func (lg *MongoLogger) Fatal(msg string, lf ...LogFields) error { return lg.log(FATAL, msg, lf...) }
+func (lg *MongoLogger) Debug(msg string, lf ...LogFields) error { return lg.Log(DEBUG, msg, lf...) }
+func (lg *MongoLogger) Trace(msg string, lf ...LogFields) error { return lg.Log(TRACE, msg, lf...) }
+func (lg *MongoLogger) Error(msg string, lf ...LogFields) error { return lg.Log(ERROR, msg, lf...) }
+func (lg *MongoLogger) Info(msg string, lf ...LogFields) error  { return lg.Log(INFO, msg, lf...) }
+func (lg *MongoLogger) Warn(msg string, lf ...LogFields) error  { return lg.Log(WARN, msg, lf...) }
+func (lg *MongoLogger) Fatal(msg string, lf ...LogFields) error { return lg.Log(FATAL, msg, lf...) }
 
 // FindLogs returns logs that match the filter
 func (lg *MongoLogger) FindLogs(filter LogFilter, maxLimit int64) ([]Log, error) {
