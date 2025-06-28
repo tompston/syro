@@ -15,19 +15,6 @@ type TimeseriesFilter struct {
 	Skip  int64
 }
 
-func RequestLogs(l Logger, maxLimit int64, urlPath string) ([]Log, error) {
-	if l == nil {
-		return nil, errors.New("logger is nil")
-	}
-
-	filter, err := parseLogsQuery(urlPath)
-	if err != nil {
-		return nil, err
-	}
-
-	return l.FindLogs(*filter, maxLimit)
-}
-
 // parse the to, from, limit and skip parameters from the URL, if they exist and are valid values.
 func parseUrlToTimeseriesParams(vals url.Values) (*TimeseriesFilter, error) {
 	filter := TimeseriesFilter{}
@@ -75,10 +62,12 @@ func parseUrlToTimeseriesParams(vals url.Values) (*TimeseriesFilter, error) {
 	return &filter, nil
 }
 
-// parseLogsQuery parses the query parameters from the URL and returns a LogFilter
-func parseLogsQuery(fullUrl string) (*LogFilter, error) {
-	// Parse the full URL
-	parsedURL, err := url.Parse(fullUrl)
+func QueryLogs(l Logger, maxLimit int64, urlPath string) ([]Log, error) {
+	if l == nil {
+		return nil, errors.New("logger is nil")
+	}
+
+	parsedURL, err := url.Parse(urlPath)
 	if err != nil {
 		return nil, errors.New("failed to parse URL")
 	}
@@ -102,49 +91,39 @@ func parseLogsQuery(fullUrl string) (*LogFilter, error) {
 		filter.Level = &logLevel
 	}
 
-	return &filter, nil
+	return l.FindLogs(filter, maxLimit)
 }
 
-/*
-// LogPayload is a util struct of data that can be parsable from outside sources
-type LogPayload struct {
-	Message string    `json:"message"`
-	Source  string    `json:"source"`
-	Event   string    `json:"event"`
-	EventID string    `json:"event_id"`
-	Fields  LogFields `json:"fields"`
-	Level   string    `json:"level"`
-}
-
-func ParseLogs(body []LogPayload) ([]Log, error) {
-	if len(body) == 0 {
-		return nil, errors.New("no logs to parse")
+func QueryCrons(s CronStorage, urlPath string) ([]CronJob, error) {
+	if s == nil {
+		return nil, errors.New("storage is nil")
 	}
 
-	logs := make([]Log, len(body))
+	return s.FindCronJobs()
+}
 
-	for i, b := range body {
-		level := LogLevel(0)
-		switch b.Level {
-		case "error":
-			level = ERROR
-		case "info":
-			level = INFO
-		case "debug":
-			level = DEBUG
-		case "warn":
-			level = WARN
-		case "trace":
-			level = TRACE
-		case "fatal":
-			level = FATAL
-		default:
-			return nil, fmt.Errorf("invalid log level: %s", b.Level)
-		}
-
-		logs[i] = NewLog(level, b.Message, b.Source, b.Event, b.EventID, b.Fields)
+func QueryCronExecutions(s CronStorage, urlPath string) ([]CronExecLog, error) {
+	if s == nil {
+		return nil, errors.New("storage is nil")
 	}
 
-	return logs, nil
+	parsedURL, err := url.Parse(urlPath)
+	if err != nil {
+		return nil, errors.New("failed to parse URL")
+	}
+
+	// Extract query parameters
+	params := parsedURL.Query()
+
+	filter := CronExecFilter{}
+	ts, err := parseUrlToTimeseriesParams(params)
+	if err != nil {
+		return nil, err
+	}
+
+	filter.TimeseriesFilter = *ts
+	filter.Source = params.Get("source")
+	filter.Name = params.Get("name")
+
+	return s.FindExecutions(filter)
 }
-*/

@@ -188,12 +188,18 @@ func NewMongoCronStorage(cronListColl, cronHistoryColl *mongo.Collection) (*Mong
 
 func (m *MongoCronStorage) CreateIndexes() error {
 	// Create indexes for the collections
-	if err := newMongoIndexes().Add("source", "name").Add("status").Create(m.cronListColl); err != nil {
+	if err := newMongoIndexes().
+		Add("source", "name").
+		Add("status").
+		Create(m.cronListColl); err != nil {
 		return err
 	}
 
 	// Create indexes for the collections
-	if err := newMongoIndexes().Add("source", "name").Add("initialized_at").Create(m.cronHistoryColl); err != nil {
+	if err := newMongoIndexes().
+		Add("source", "name").
+		Add("initialized_at").
+		Create(m.cronHistoryColl); err != nil {
 		return err
 	}
 

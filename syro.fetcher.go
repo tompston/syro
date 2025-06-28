@@ -32,9 +32,6 @@ func (r *Request) WithHeaders(headers map[string]string) *Request {
 }
 
 func (r *Request) WithHeader(key, value string) *Request {
-	if r.Headers == nil {
-		r.Headers = make(map[string]string)
-	}
 	r.Headers[key] = value
 	return r
 }
@@ -56,7 +53,7 @@ func (r *Request) WithTLSClientConfig(tlsConfig *tls.Config) *Request {
 
 type Response struct {
 	Body       []byte
-	Headers    http.Header
+	Header     http.Header
 	StatusCode int
 	RequestURL string // The URL that was requested
 }
@@ -78,7 +75,7 @@ func (r *Request) Fetch() (*Response, error) {
 		reqBody = r.Body
 	}
 
-	req, err := http.NewRequest(r.Method, r.URL, bytes.NewBuffer(reqBody))
+	req, err := http.NewRequest(r.Method, url, bytes.NewBuffer(reqBody))
 	if err != nil {
 		return nil, err
 	}
