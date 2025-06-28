@@ -45,24 +45,27 @@ func (eg *ErrGroup) GetErrors() []error {
 
 // Error implements the error interface. It returns a concatenated string of all
 // non-nil ErrGroup, each separated by a semicolon.
+//
+// TODO: write tests for this method
 func (eg *ErrGroup) Error() string {
 	if eg == nil || len(eg.Errors) == 0 {
 		return ""
 	}
 
+	propsExist := eg.Props != nil
+
 	sb := strings.Builder{}
-	if eg.Props != nil && eg.Props.ID != "" {
+	if propsExist && eg.Props.ID != "" {
 		sb.WriteString(eg.Props.ID)
 		sb.WriteString(": ")
 	}
 
-	// TODO: write tests for this method
 	for _, err := range eg.Errors {
 		if err != nil {
 			sb.WriteString(err.Error())
 			sb.WriteString("; ")
 
-			if eg.Props != nil && eg.Props.WithNewline {
+			if propsExist && eg.Props.WithNewline {
 				sb.WriteString("\n")
 			}
 		}
