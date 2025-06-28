@@ -8,6 +8,18 @@ import (
 	"time"
 )
 
+type query struct {
+	Logs           func(l Logger, maxLimit int64, urlPath string) ([]Log, error)
+	Crons          func(s CronStorage, urlPath string) ([]CronJob, error)
+	CronExecutions func(s CronStorage, urlPath string) ([]CronExecLog, error)
+}
+
+var Query = query{
+	Logs:           QueryLogs,
+	Crons:          QueryCrons,
+	CronExecutions: QueryCronExecutions,
+}
+
 type TimeseriesFilter struct {
 	From  time.Time
 	To    time.Time
