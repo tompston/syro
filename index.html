@@ -3,7 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <!-- <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script> -->
-    <title>Logs Viewer</title>
+    <title>syro</title>
+    <!-- <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script> -->
     <script type="module">
       import van from "https://cdn.jsdelivr.net/gh/vanjs-org/van/public/van-1.5.5.min.js";
 
@@ -30,10 +31,6 @@
           5: { label: "ERROR", class: "log-error" },
           6: { label: "FATAL", class: "log-fatal" },
         };
-
-        function levelIsValid(level) {
-          return Object.keys(LEVEL_MAP).includes(level);
-        }
 
         const baseUrl = "http://localhost:3094/logs";
 
@@ -79,7 +76,11 @@
           const className = entry?.class || "";
 
           return div(
-            { class: "log-row log-grid" },
+            {
+              class: "log-row log-grid",
+              style:
+                "font-size: 12px;font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
+            },
             div(log.ts),
             div({ class: className }, label),
             div(log.source || "-"),
@@ -167,7 +168,7 @@
       }
 
       .log-trace {
-        color: gray;
+        color: rgb(240, 106, 236);
         border: 1px solid #ccc;
       }
       .log-debug {
