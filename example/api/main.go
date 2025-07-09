@@ -61,7 +61,11 @@ func ExposeTestServer() {
 func doRandomLogging(logger *syro.MongoLogger) {
 	levels := syro.LogLevels
 	randLevel := levels[rand.Intn(len(levels))]
-	logger.Log(randLevel, RandomString(10))
+	logger.Log(randLevel, RandomString(RandomInt(25, 500)))
+}
+
+func RandomInt(min, max int) int {
+	return rand.Intn(max-min) + min
 }
 
 func startServer(logger *syro.MongoLogger) {
@@ -95,7 +99,7 @@ func startServer(logger *syro.MongoLogger) {
 // }
 
 func RandomString(n int) string {
-	const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	const letterBytes = " abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	b := make([]byte, n)
 	for i := range b {
 		b[i] = letterBytes[rand.Intn(len(letterBytes))]
