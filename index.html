@@ -1,0 +1,155 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <!-- <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script> -->
+    <title>Logs Viewer</title>
+    <script type="module">
+      import van from "https://cdn.jsdelivr.net/gh/vanjs-org/van/public/van-1.5.5.min.js";
+
+      const { div, form, input, select, option, button, style } = van.tags;
+
+      // === STATE ===
+      const logs = van.state([]);
+      const isLoadingLogs = van.state(true);
+      const logsError = van.state(null);
+      const logLimit = 400;
+
+      const filters = {
+        from: van.state(""),
+        to: van.state(""),
+        level: van.state(""),
+        source: van.state(""),
+        event: van.state(""),
+      };
+
+      const levelOptions = [
+        { label: "TRACE", value: "0" },
+        { label: "DEBUG", value: "1" },
+        { label: "INFO", value: "2" },
+        { label: "WARN", value: "3" },
+        { label: "ERROR", value: "4" },
+        { label: "FATAL", value: "5" },
+      ];
+
+      const baseUrl = "http://localhost:3094/logs";
+
+      const constructApiUrl = () => {
+        const params = new URLSearchParams();
+        if (filters.from.val) params.append("from", filters.from.val);
+        if (filters.to.val) params.append("to", filters.to.val);
+        if (filters.level.val) params.append("level", filters.level.val);
+        if (filters.source.val) params.append("source", filters.source.val);
+        if (filters.event.val) params.append("event", filters.event.val);
+        return `${baseUrl}?limit=50${params.toString()}`;
+      };
+
+      const fetchLogs = async () => {
+        try {
+          logsError.val = null;
+          isLoadingLogs.val = true;
+
+          const response = await fetch(constructApiUrl());
+          if (!response.ok)
+            throw new Error(`${response.status}: ${response.statusText}`);
+
+          const data = await response.json();
+          if (Array.isArray(data)) {
+            data.sort((a, b) => new Date(b.time) - new Date(a.time));
+            logs.val = data;
+          } else {
+            logs.val = [];
+            logsError.val = "No logs found.";
+          }
+        } catch (e) {
+          logsError.val = e.message || "Failed to fetch logs.";
+        } finally {
+          isLoadingLogs.val = false;
+        }
+      };
+
+      const applyFilters = (e) => {
+        e.preventDefault();
+        fetchLogs();
+      };
+
+      const LogRow = (log) =>
+        div(
+          { class: "log-row" },
+          div(log.ts),
+          div(log.level),
+          div(log.source || "-"),
+          div(log.event || "-"),
+          div(log.event_id || "-"),
+          div(log.message) // Placeholder for action
+        );
+
+      const LogTable = () =>
+        div(
+          div(
+            { class: "uppercase font-bold sticky top-0" },
+            div(
+              { class: "log-table table-1-header" },
+              div({ class: "pl-2" }, "ts"),
+              div("level"),
+              div("source"),
+              div("event"),
+              div("event_id"),
+              div("")
+            )
+          ),
+          van.derive(() =>
+            div(
+              //   div("qwe"),
+              div(logs.val.map((log) => div({ key: log._id }, LogRow(log))))
+            )
+          )
+        );
+
+      const FilterForm = () =>
+        form(
+          { onsubmit: applyFilters },
+          div(input({ type: "datetime-local", bind: filters.from })),
+          div(input({ type: "datetime-local", bind: filters.to })),
+          div(
+            select(
+              { bind: filters.level },
+              option({ value: "" }, "All Levels"),
+              ...levelOptions.map((o) => option({ value: o.value }, o.label))
+            )
+          ),
+          div(input({ placeholder: "source", bind: filters.source })),
+          div(input({ placeholder: "event", bind: filters.event })),
+          button({ type: "submit" }, "Apply Filters")
+        );
+
+      const App = () =>
+        div(
+          { style: "display: flex; gap: 20px;" },
+          div({ id: "sidebar" }, FilterForm()),
+          div({ id: "main" }, LogTable())
+        );
+
+      // Mount and refresh interval
+      van.add(document.body, App());
+      fetchLogs();
+      const interval = setInterval(fetchLogs, 5000);
+      window.addEventListener("beforeunload", () => clearInterval(interval));
+    </script>
+    <style>
+      .log-table {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        gap: 0.5em;
+      }
+      .log-row {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        gap: 0.5em;
+        border-bottom: 1px solid #ccc;
+        padding: 0.5em 0;
+      }
+    </style>
+  </head>
+  <body></body>
+</html>

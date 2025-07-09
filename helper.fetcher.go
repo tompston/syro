@@ -110,7 +110,7 @@ func (r *Request) Fetch() (*Response, error) {
 	if res.StatusCode != 200 && res.StatusCode != 201 && res.StatusCode != 202 {
 		bodyStr := ""
 		if body != nil {
-			bodyUpTo := min(len(body), 1000) // limit to 1000 characters
+			bodyUpTo := min(len(body), 1000) // limit to x characters
 			bodyStr = string(body[:bodyUpTo])
 		}
 

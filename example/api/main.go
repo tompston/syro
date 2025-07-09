@@ -17,20 +17,31 @@ func main() {
 	ExposeTestServer()
 }
 
-func ExposeTestServer() {
-	url := "mongodb://localhost:27017"
+const (
+	dbName = "test"
+	apiUrl = "localhost:3094"
+)
 
-	const (
-		dbName = "test"
-		apiUrl = "localhost:3094"
-	)
+func setupConn() (*mongo.Client, error) {
+	url := "mongodb://localhost:27017"
 
 	opt := options.Client().
 		SetMaxPoolSize(20).                   // Set the maximum number of connections in the connection pool
 		SetMaxConnIdleTime(10 * time.Minute). // Close idle connections after the specified time
 		ApplyURI(url)
 
-	conn, err := mongo.Connect(context.Background(), opt)
+	// conn, err := mongo.Connect(context.Background(), opt)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// defer conn.Disconnect(context.Background())
+
+	return mongo.Connect(context.Background(), opt)
+}
+
+func ExposeTestServer() {
+
+	conn, err := setupConn()
 	if err != nil {
 		log.Fatalf("failed to connect to MongoDB: %v", err)
 	}
@@ -38,18 +49,31 @@ func ExposeTestServer() {
 
 	coll := conn.Database(dbName).Collection("test_collection_logs")
 	logger := syro.NewMongoLogger(coll, nil)
-	queries := syro.Query()
 
-	// HTTP handler for /logs
+	if err := logger.CreateIndexes(); err != nil {
+		log.Fatalf("failed to create indexes: %v", err)
+	}
+
+	go startRandomLogging(logger)
+	startServer(logger)
+}
+
+func doRandomLogging(logger *syro.MongoLogger) {
+	levels := syro.LogLevels
+	randLevel := levels[rand.Intn(len(levels))]
+	logger.Log(randLevel, RandomString(10))
+}
+
+func startServer(logger *syro.MongoLogger) {
+	finder := syro.Finder()
+
 	http.HandleFunc("GET /logs", func(w http.ResponseWriter, r *http.Request) {
-		// Allow CORS
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Credentials", "false")
 		w.Header().Set("Content-Type", "application/json")
 
 		const maxLimit = 1000
-
-		data, err := queries.Logs(logger, maxLimit, r.URL.String())
+		data, err := finder.Logs(logger, maxLimit, r.URL.String())
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -60,20 +84,28 @@ func ExposeTestServer() {
 		}
 	})
 
+	log.Printf("Server is listening at http://%s", apiUrl)
 	if err := http.ListenAndServe(apiUrl, nil); err != nil {
 		log.Fatalf("server failed: %v", err)
 	}
 }
 
-func doRandomLogging(logger *syro.MongoLogger) {
-	randomLevel := RandomElement(syro.LogLevels)
-	logger.Log(randomLevel, "qweqwe")
+// func RandomElement[T any](slice []T) T {
+// 	return slice[rand.Intn(len(slice))]
+// }
+
+func RandomString(n int) string {
+	const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = letterBytes[rand.Intn(len(letterBytes))]
+	}
+	return string(b)
 }
 
-func RandomElement[T any](slice []T) T {
-	if len(slice) == 0 {
-		panic("cannot select random element from empty slice")
+func startRandomLogging(logger *syro.MongoLogger) {
+	for {
+		doRandomLogging(logger)
+		time.Sleep(1 * time.Second)
 	}
-	rand.Seed(time.Now().UnixNano())
-	return slice[rand.Intn(len(slice))]
 }

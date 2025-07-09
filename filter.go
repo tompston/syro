@@ -16,14 +16,14 @@ type TimeseriesFilter struct {
 }
 
 // Struct for grouping up / exposing query functions that use the interfaces
-type query struct {
+type finder struct {
 	Logs           func(l Logger, maxLimit int64, urlPath string) ([]Log, error)
 	Crons          func(s CronStorage, urlPath string) ([]CronJob, error)
 	CronExecutions func(s CronStorage, urlPath string) ([]CronExecLog, error)
 }
 
-func Query() query {
-	return query{
+func Finder() finder {
+	return finder{
 		Logs:           queryLogs,
 		Crons:          queryCrons,
 		CronExecutions: queryCronExecutions,
