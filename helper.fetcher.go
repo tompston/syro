@@ -2,14 +2,13 @@ package syro
 
 import (
 	"bytes"
-	"crypto/tls"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"maps"
 	"net/http"
 )
 
-// TODO: test this
 // NOTE: util method which can generate a curl request for easier sharing of requests
 // NOTE: maybe rename this to Fetch or Curl ?
 type Request struct {
@@ -17,8 +16,8 @@ type Request struct {
 	URL               string
 	Headers           map[string]string
 	Body              []byte
-	IgnoreStatusCodes bool
-	TLSClientConfig   *tls.Config
+	ignoreStatusCodes bool
+	client            *http.Client // Optional custom HTTP client, if nil, default client will be used
 }
 
 func NewRequest(method, url string) *Request {
@@ -26,11 +25,19 @@ func NewRequest(method, url string) *Request {
 		Method:  method,
 		URL:     url,
 		Headers: make(map[string]string),
+		client:  &http.Client{},
 	}
 }
 
 func (r *Request) WithHeaders(headers map[string]string) *Request {
 	maps.Copy(r.Headers, headers)
+	return r
+}
+
+func (r *Request) WithBasicAuth(username, password string) *Request {
+	auth := fmt.Sprintf("%s:%s", username, password)
+	encoded := base64.StdEncoding.EncodeToString([]byte(auth))
+	r.Headers["Authorization"] = "Basic " + encoded
 	return r
 }
 
@@ -45,12 +52,14 @@ func (r *Request) WithBody(body []byte) *Request {
 }
 
 func (r *Request) WithIgnoreStatusCodes(ignore bool) *Request {
-	r.IgnoreStatusCodes = ignore
+	r.ignoreStatusCodes = ignore
 	return r
 }
 
-func (r *Request) WithTLSClientConfig(tlsConfig *tls.Config) *Request {
-	r.TLSClientConfig = tlsConfig
+func (r *Request) WithClient(client *http.Client) *Request {
+	if client != nil {
+		r.client = client
+	}
 	return r
 }
 
@@ -61,7 +70,7 @@ type Response struct {
 	RequestURL string // The URL that was requested
 }
 
-func (r *Request) Fetch() (*Response, error) {
+func (r *Request) Do() (*Response, error) {
 
 	url := r.URL
 
@@ -87,10 +96,7 @@ func (r *Request) Fetch() (*Response, error) {
 		req.Header.Set(k, v)
 	}
 
-	client := &http.Client{}
-	if r.TLSClientConfig != nil {
-		client.Transport = &http.Transport{TLSClientConfig: r.TLSClientConfig}
-	}
+	client := r.client
 
 	res, err := client.Do(req)
 	if err != nil {
@@ -103,7 +109,7 @@ func (r *Request) Fetch() (*Response, error) {
 		return nil, fmt.Errorf("error reading response body when fetching %v, status %v: %v, error: ", url, res.Status, err)
 	}
 
-	if r.IgnoreStatusCodes {
+	if r.ignoreStatusCodes {
 		return &Response{body, res.Header, res.StatusCode, r.URL}, nil
 	}
 

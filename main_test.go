@@ -445,9 +445,7 @@ func TestMongoLogger(t *testing.T) {
 	})
 }
 
-// stringIncludes checks if the input string contains all of the strings in
-// the array. If the input string does not contain a strings from the
-// array, an error is returned.
+// stringIncludes checks if the input string contains all of the strings in the array.
 func stringIncludes(s string, arr []string) error {
 	for _, str := range arr {
 		if !strings.Contains(s, str) {
@@ -465,9 +463,11 @@ func TestJobLocker(t *testing.T) {
 			atomic.AddInt32(&counter, 1)
 		}, "testJob")
 
+		const maxRuns = 10
+
 		var wg sync.WaitGroup
-		wg.Add(10)
-		for i := 0; i < 10; i++ {
+		wg.Add(maxRuns)
+		for range maxRuns {
 			go func() {
 				defer wg.Done()
 				j.Run()
@@ -533,11 +533,11 @@ func TestRequest(t *testing.T) {
 
 	t.Run("with-ignore-status-codes", func(t *testing.T) {
 		req := NewRequest("GET", "http://example.com").WithIgnoreStatusCodes(true)
-		if !req.IgnoreStatusCodes {
+		if !req.ignoreStatusCodes {
 			t.Error("expected IgnoreStatusCodes to be true")
 		}
 
-		res, err := req.Fetch()
+		res, err := req.Do()
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -551,13 +551,13 @@ func TestRequest(t *testing.T) {
 
 	t.Run("fetch-missing-method-or-url", func(t *testing.T) {
 		req := NewRequest("", "")
-		_, err := req.Fetch()
+		_, err := req.Do()
 		if err == nil || err.Error() != "request method is not set" {
 			t.Errorf("expected error on missing method, got: %v", err)
 		}
 
 		req = NewRequest("GET", "")
-		_, err = req.Fetch()
+		_, err = req.Do()
 		if err == nil || err.Error() != "request URL is not set" {
 			t.Errorf("expected error on missing URL, got: %v", err)
 		}
@@ -573,7 +573,7 @@ func TestRequest(t *testing.T) {
 		fmt.Printf("server.URL: %v\n", server.URL)
 
 		req := NewRequest("GET", server.URL)
-		res, err := req.Fetch()
+		res, err := req.Do()
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -594,7 +594,7 @@ func TestRequest(t *testing.T) {
 
 		req := NewRequest("GET", server.URL)
 
-		_, err := req.Fetch()
+		_, err := req.Do()
 		if err == nil || !contains(err.Error(), "status: 418") {
 			t.Errorf("expected status error, got: %v", err)
 		}

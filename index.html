@@ -81,7 +81,7 @@
               style:
                 "font-size: 12px;font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
             },
-            div(log.ts),
+            div({ class: "pl-2" }, div(log.ts)),
             div({ class: className }, label),
             div(log.source || "-"),
             div(log.event || "-"),
