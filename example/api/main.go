@@ -59,9 +59,12 @@ func ExposeTestServer() {
 }
 
 func doRandomLogging(logger *syro.MongoLogger) {
+
+	logFields := GenerateRandomLogFields(RandomInt(0, 8))
+
 	levels := syro.LogLevels
 	randLevel := levels[rand.Intn(len(levels))]
-	logger.Log(randLevel, RandomString(RandomInt(25, 500)))
+	logger.Log(randLevel, RandomString(RandomInt(25, 500)), logFields)
 }
 
 func RandomInt(min, max int) int {
@@ -94,12 +97,8 @@ func startServer(logger *syro.MongoLogger) {
 	}
 }
 
-// func RandomElement[T any](slice []T) T {
-// 	return slice[rand.Intn(len(slice))]
-// }
-
 func RandomString(n int) string {
-	const letterBytes = " abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	const letterBytes = "         abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	b := make([]byte, n)
 	for i := range b {
 		b[i] = letterBytes[rand.Intn(len(letterBytes))]
@@ -112,4 +111,62 @@ func startRandomLogging(logger *syro.MongoLogger) {
 		doRandomLogging(logger)
 		time.Sleep(1 * time.Second)
 	}
+}
+
+func GenerateRandomLogFields(n int) syro.LogFields {
+	var letters = []rune("abcdefghijklmnopqrstuvwxyz")
+	var words = []string{
+		"foo", "bar", "baz", "qux", "lorem", "ipsum", "dolor", "sit", "amet", "consectetur",
+	}
+
+	randomStringValue := func(long bool) string {
+		if long {
+			n := 5 + rand.Intn(10)
+			s := ""
+			for i := 0; i < n; i++ {
+				s += words[rand.Intn(len(words))] + " "
+			}
+			return s
+		}
+		return words[rand.Intn(len(words))]
+	}
+
+	randomValue := func() any {
+		choice := rand.Intn(3)
+		long := rand.Float32() < 0.5
+
+		switch choice {
+		case 0:
+			return randomStringValue(long)
+		case 1:
+			if long {
+				return rand.Intn(10000)
+			}
+			return rand.Intn(100)
+		case 2:
+			f := rand.Float64() * 100
+			if long {
+				return f * 100
+			}
+			return f
+		default:
+			return nil
+		}
+	}
+
+	randomKey := func(length int) string {
+		b := make([]rune, length)
+		for i := range b {
+			b[i] = letters[rand.Intn(len(letters))]
+		}
+		return string(b)
+	}
+
+	logFields := make(syro.LogFields)
+	for i := 0; i < n; i++ {
+		key := randomKey(3 + rand.Intn(3)) // 3-5 chars
+		logFields[key] = randomValue()
+	}
+
+	return logFields
 }

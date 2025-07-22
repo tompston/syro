@@ -8,14 +8,15 @@
     <script type="module">
       import van from "https://cdn.jsdelivr.net/gh/vanjs-org/van/public/van-1.5.5.min.js";
 
-      const { div, form, input, select, option, button, style } = van.tags;
+      const { div, form, input, select, option, button, style, span } =
+        van.tags;
 
       const LogsPage = (() => {
         const logs = van.state([]);
         const isLoading = van.state(true);
         const error = van.state(null);
 
-        const filters = {
+        let filters = {
           from: van.state(""),
           to: van.state(""),
           level: van.state(""),
@@ -67,6 +68,7 @@
 
         const applyFilters = (e) => {
           e.preventDefault();
+          console.log(filters);
           fetchLogs();
         };
 
@@ -75,18 +77,50 @@
           const label = entry?.label || log.level;
           const className = entry?.class || "";
 
+          const sep = "*";
+
+          let eventSource = `${log.source || sep}.${log.event || sep}.${log.event_id || sep}`;
+
+          // if the log.fiedls is an object, sort iit base on keys, for consistency
+          let fields = log.fields || {};
+          const sortedFields = Object.keys(fields)
+            .sort() // ascending alphabetical order
+            .reduce((acc, key) => {
+              acc[key] = fields[key];
+              return acc;
+            }, {});
+
           return div(
             {
               class: "log-row log-grid",
               style:
                 "font-size: 12px;font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
             },
-            div({ class: "pl-2" }, div(log.ts)),
+            div(
+              {
+                class: "pl-2",
+              },
+              div(log.ts)
+            ),
             div({ class: className }, label),
-            div(log.source || "-"),
-            div(log.event || "-"),
-            div(log.event_id || "-"),
-            div(log.message || "")
+            div(eventSource),
+            div(
+              // { style: "display:flex;" },
+              div(log.message || ""),
+              div(
+                { style: "display:flex;gap:3px;" },
+                Object.entries(sortedFields).map(([key, value]) =>
+                  span(
+                    {
+                      key,
+                      style:
+                        "background-color:gray; border-radius:3px; font-size:11px; padding:5px;opacity: 0.8;",
+                    },
+                    `${key}:${value}`
+                  )
+                )
+              )
+            )
           );
         };
 
@@ -99,9 +133,7 @@
                 div({ class: "pl-2" }, "time"),
                 div("level"),
                 div("source"),
-                div("event"),
-                div("event_id"),
-                div("")
+                div("msg")
               )
             ),
             van.derive(() =>
@@ -158,12 +190,12 @@
     <style>
       .log-grid {
         display: grid;
-        grid-template-columns: 230px 100px 150px 150px 150px auto;
+        grid-template-columns: 215px 100px 150px auto;
         gap: 0.5em;
       }
 
       .log-row {
-        border-bottom: 1px solid #ccc;
+        border-bottom: 1px dashed #818181;
         padding: 0.5em 0;
       }
 
