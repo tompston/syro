@@ -24,6 +24,8 @@
           event: van.state(""),
         };
 
+        const searchText = van.state("");
+
         const LEVEL_MAP = {
           1: { label: "TRACE", class: "log-trace" },
           2: { label: "DEBUG", class: "log-debug" },
@@ -84,7 +86,7 @@
           // if the log.fiedls is an object, sort iit base on keys, for consistency
           let fields = log.fields || {};
           const sortedFields = Object.keys(fields)
-            .sort() // ascending alphabetical order
+            .sort()
             .reduce((acc, key) => {
               acc[key] = fields[key];
               return acc;
@@ -108,13 +110,13 @@
               // { style: "display:flex;" },
               div(log.message || ""),
               div(
-                { style: "display:flex;gap:3px;" },
+                { style: "display:flex; gap:3px; flex-wrap: wrap;" },
                 Object.entries(sortedFields).map(([key, value]) =>
                   span(
                     {
                       key,
                       style:
-                        "background-color:gray; border-radius:3px; font-size:11px; padding:5px;opacity: 0.8;",
+                        "background-color:gray; border-radius:4px; font-size:10px; padding:5px;opacity: 0.7; color: white;",
                     },
                     `${key}:${value}`
                   )
@@ -136,9 +138,23 @@
                 div("msg")
               )
             ),
-            van.derive(() =>
-              div(logs.val.map((log) => div({ key: log._id }, LogRow(log))))
-            )
+            van.derive(() => {
+              const search = searchText.val.toLowerCase();
+              const filteredLogs = logs.val.filter((log) => {
+                // a dumb way to preserver the lof filtering logic. This is done
+                // because the pretty level name is not in the response.
+                const logLevel =
+                  LEVEL_MAP[log.level]?.label.toLowerCase() || "unknown";
+
+                return JSON.stringify(log + logLevel)
+                  .toLowerCase()
+                  .includes(search);
+              });
+
+              return div(
+                filteredLogs.map((log) => div({ key: log._id }, LogRow(log)))
+              );
+            })
           );
 
         const FilterForm = () =>
@@ -182,6 +198,13 @@
                 placeholder: "event",
                 value: filters.event.val,
                 oninput: (e) => (filters.event.val = e.target.value),
+              })
+            ),
+            div(
+              input({
+                placeholder: "Search",
+                value: searchText.val,
+                oninput: (e) => (searchText.val = e.target.value),
               })
             ),
             button({ type: "submit" }, "Apply Filters")
