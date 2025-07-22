@@ -16,6 +16,7 @@
         const logs = van.state([]);
         const isLoading = van.state(true);
         const error = van.state(null);
+        const isPaused = van.state(false);
 
         const MAX_LOGS = 500;
         const logMap = new Map();
@@ -256,7 +257,17 @@
                 oninput: (e) => (searchText.val = e.target.value),
               })
             ),
-            button({ type: "submit" }, "Apply Filters")
+            button({ type: "submit" }, "Apply Filters"),
+            button(
+              {
+                type: "button",
+                onclick: () => (isPaused.val = !isPaused.val),
+                style: "margin-top: 10px",
+              },
+              van.derive(() =>
+                isPaused.val ? "▶️ Resume Fetching" : "⏸️ Pause Fetching"
+              )
+            )
           );
 
         const View = () =>
@@ -271,13 +282,6 @@
           fetchLogs,
         };
       })();
-
-      //   const App = () =>
-      //     div(
-      //       { style: "display: flex; gap: 20px;" },
-      //       div({ id: "sidebar" }, FilterForm()),
-      //       div({ id: "main" }, LogTable())
-      //     );
 
       // Mount and refresh
       van.add(document.body, LogsPage.View());
