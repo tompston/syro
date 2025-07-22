@@ -2,9 +2,10 @@
 <html>
   <head>
     <meta charset="UTF-8" />
-    <!-- <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script> -->
     <title>syro</title>
     <!-- <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script> -->
+    <link rel="stylesheet" href="https://unpkg.com/98.css" />
+
     <script type="module">
       import van from "https://cdn.jsdelivr.net/gh/vanjs-org/van/public/van-1.5.5.min.js";
 
@@ -15,6 +16,10 @@
         const logs = van.state([]);
         const isLoading = van.state(true);
         const error = van.state(null);
+
+        const MAX_LOGS = 500;
+        const logMap = new Map();
+        let lastUrl = null;
 
         let filters = {
           from: van.state(""),
@@ -37,10 +42,20 @@
 
         const baseUrl = "http://localhost:3094/logs";
 
+        function isDate(value) {
+          return !isNaN(Date.parse(value));
+        }
+
         const constructApiUrl = () => {
           const params = new URLSearchParams();
-          if (filters.from.val) params.append("from", filters.from.val);
-          if (filters.to.val) params.append("to", filters.to.val);
+          if (filters.from.val && isDate(filters.from.val)) {
+            params.append("from", filters.from.val + ":00Z");
+          }
+
+          if (filters.to.val && isDate(filters.to.val)) {
+            params.append("to", filters.to.val + ":00Z");
+          }
+
           if (filters.level.val) params.append("level", filters.level.val);
           if (filters.source.val) params.append("source", filters.source.val);
           if (filters.event.val) params.append("event", filters.event.val);
@@ -51,15 +66,49 @@
           try {
             error.val = null;
             isLoading.val = true;
-            const res = await fetch(constructApiUrl());
+
+            const url = constructApiUrl();
+            const res = await fetch(url);
             if (!res.ok) throw new Error(`${res.status}: ${res.statusText}`);
             const data = await res.json();
-            if (Array.isArray(data)) {
-              data.sort((a, b) => new Date(b.time) - new Date(a.time));
-              logs.val = data;
-            } else {
-              logs.val = [];
+
+            if (!Array.isArray(data)) {
               error.val = "No logs found.";
+              return;
+            }
+
+            data.sort((a, b) => new Date(b.time) - new Date(a.time));
+
+            if (url === lastUrl) {
+              const newLogs = [];
+
+              for (const log of data) {
+                if (!logMap.has(log._id)) {
+                  logMap.set(log._id, log);
+                  newLogs.push(log);
+                }
+              }
+
+              if (newLogs.length > 0) {
+                const merged = [...newLogs, ...logs.val];
+
+                // Trim logs and logMap to max size
+                const trimmed = merged.slice(0, MAX_LOGS);
+                logs.val = trimmed;
+
+                // Keep logMap in sync
+                const newMap = new Map();
+                for (const log of trimmed) newMap.set(log._id, log);
+                logMap.clear();
+                for (const [k, v] of newMap) logMap.set(k, v);
+              }
+            } else {
+              logMap.clear();
+              for (const log of data.slice(0, MAX_LOGS)) {
+                logMap.set(log._id, log);
+              }
+              logs.val = data.slice(0, MAX_LOGS);
+              lastUrl = url;
             }
           } catch (e) {
             error.val = e.message;
@@ -77,7 +126,7 @@
         const LogRow = (log) => {
           const entry = LEVEL_MAP[log.level];
           const label = entry?.label || log.level;
-          const className = entry?.class || "";
+          const className = entry?.class + " llb" || "";
 
           const sep = "*";
 
@@ -96,7 +145,7 @@
             {
               class: "log-row log-grid",
               style:
-                "font-size: 12px;font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
+                "font-size: 11px;font-family: Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
             },
             div(
               {
@@ -104,7 +153,7 @@
               },
               div(log.ts)
             ),
-            div({ class: className }, label),
+            div(div({ class: className }, label)),
             div(eventSource),
             div(
               // { style: "display:flex;" },
@@ -146,7 +195,7 @@
                 const logLevel =
                   LEVEL_MAP[log.level]?.label.toLowerCase() || "unknown";
 
-                return JSON.stringify(log + logLevel)
+                return JSON.stringify({ ...log, levelLabel: logLevel })
                   .toLowerCase()
                   .includes(search);
               });
@@ -240,7 +289,7 @@
     <style>
       .log-grid {
         display: grid;
-        grid-template-columns: 215px 100px 150px auto;
+        grid-template-columns: 190px 100px 150px auto;
         gap: 0.5em;
       }
 
@@ -249,22 +298,46 @@
         padding: 0.5em 0;
       }
 
+      /* log-level-base */
+      .llb {
+        display: inline-block;
+        padding: 2px 10px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 500;
+        font-family:
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          Roboto,
+          Oxygen,
+          Ubuntu,
+          Cantarell,
+          "Open Sans",
+          "Helvetica Neue",
+          sans-serif;
+      }
+
       .log-trace {
-        color: rgb(240, 106, 236);
-        border: 1px solid #ccc;
+        color: rgb(250, 250, 250);
+        background: rgb(249, 176, 248);
       }
       .log-debug {
         color: teal;
-        border: 1px solid rgb(38, 160, 160);
+        background-color: rgba(0, 226, 226, 0.316);
       }
       .log-info {
-        color: blue;
+        color: green;
+        background: rgb(180, 215, 180);
       }
       .log-warn {
-        color: orange;
+        color: rgb(206, 172, 0);
+        background-color: bisque;
       }
       .log-error {
-        color: red;
+        color: rgb(50, 46, 46);
+        background: rgb(245, 160, 160);
       }
       .log-fatal {
         color: darkred;
