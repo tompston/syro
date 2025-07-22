@@ -144,19 +144,46 @@
         const FilterForm = () =>
           form(
             { onsubmit: applyFilters },
-            div(input({ type: "datetime-local", bind: filters.from })),
-            div(input({ type: "datetime-local", bind: filters.to })),
+            div(
+              input({
+                type: "datetime-local",
+                value: filters.from.val,
+                oninput: (e) => (filters.from.val = e.target.value),
+              })
+            ),
+            div(
+              input({
+                type: "datetime-local",
+                value: filters.to.val,
+                oninput: (e) => (filters.to.val = e.target.value),
+              })
+            ),
             div(
               select(
-                { bind: filters.level },
+                {
+                  value: filters.level.val,
+                  onchange: (e) => (filters.level.val = e.target.value),
+                },
                 option({ value: "" }, "All Levels"),
                 ...Object.entries(LEVEL_MAP).map(([value, entry]) =>
                   option({ value }, entry.label)
                 )
               )
             ),
-            div(input({ placeholder: "source", bind: filters.source })),
-            div(input({ placeholder: "event", bind: filters.event })),
+            div(
+              input({
+                placeholder: "source",
+                value: filters.source.val,
+                oninput: (e) => (filters.source.val = e.target.value),
+              })
+            ),
+            div(
+              input({
+                placeholder: "event",
+                value: filters.event.val,
+                oninput: (e) => (filters.event.val = e.target.value),
+              })
+            ),
             button({ type: "submit" }, "Apply Filters")
           );
 
