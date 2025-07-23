@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <title>syro</title>
     <!-- <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script> -->
-    <link rel="stylesheet" href="https://unpkg.com/98.css" />
+    <!-- <link rel="stylesheet" href="https://unpkg.com/98.css" /> -->
 
     <script type="module">
       import van from "https://cdn.jsdelivr.net/gh/vanjs-org/van/public/van-1.5.5.min.js";
@@ -224,6 +224,7 @@
                 oninput: (e) => (filters.to.val = e.target.value),
               })
             ),
+
             div(
               select(
                 {
@@ -277,18 +278,21 @@
             div({ id: "main" }, LogTable())
           );
 
-        return {
-          View,
-          fetchLogs,
-        };
+        // Run once at mount
+        fetchLogs();
+
+        const interval = setInterval(() => {
+          if (!isPaused.val) fetchLogs();
+        }, 5000);
+
+        window.addEventListener("beforeunload", () => clearInterval(interval));
+
+        return { View };
       })();
 
       // Mount and refresh
       van.add(document.body, LogsPage.View());
       LogsPage.fetchLogs();
-
-      const interval = setInterval(LogsPage.fetchLogs, 5000);
-      window.addEventListener("beforeunload", () => clearInterval(interval));
     </script>
     <style>
       .log-grid {
@@ -327,22 +331,27 @@
         color: rgb(250, 250, 250);
         background: rgb(249, 176, 248);
       }
+
       .log-debug {
         color: teal;
         background-color: rgba(0, 226, 226, 0.316);
       }
+
       .log-info {
         color: green;
         background: rgb(180, 215, 180);
       }
+
       .log-warn {
-        color: rgb(206, 172, 0);
-        background-color: bisque;
+        color: rgb(251, 211, 10);
+        background-color: rgb(203, 120, 19);
       }
+
       .log-error {
         color: rgb(50, 46, 46);
         background: rgb(245, 160, 160);
       }
+
       .log-fatal {
         color: darkred;
       }
