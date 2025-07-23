@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <title>syro</title>
-    <!-- <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script> -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <!-- <link rel="stylesheet" href="https://unpkg.com/98.css" /> -->
 
     <script type="module">
@@ -11,6 +11,21 @@
 
       const { div, form, input, select, option, button, style, span } =
         van.tags;
+
+      function prettifyDate(v) {
+        try {
+          return new Date(v).toLocaleString(undefined, {
+            year: "numeric",
+            month: "short",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+          });
+        } catch (e) {
+          return "Invalid Date";
+        }
+      }
 
       const LogsPage = (() => {
         const logs = van.state([]);
@@ -54,7 +69,7 @@
           }
 
           if (filters.to.val && isDate(filters.to.val)) {
-            params.append("to", filters.to.val + ":00Z");
+            params.append("to", filters.to.val + "");
           }
 
           if (filters.level.val) params.append("level", filters.level.val);
@@ -70,8 +85,12 @@
 
             const url = constructApiUrl();
             const res = await fetch(url);
-            if (!res.ok) throw new Error(`${res.status}: ${res.statusText}`);
             const data = await res.json();
+            if (!res.ok) {
+              throw new Error(
+                `${res.status}: ${res.statusText}, ${JSON.stringify(data) || "Unknown error"}`
+              );
+            }
 
             if (!Array.isArray(data)) {
               error.val = "No logs found.";
@@ -152,7 +171,7 @@
               {
                 class: "pl-2",
               },
-              div(log.ts)
+              div(prettifyDate(log.ts))
             ),
             div(div({ class: className }, label)),
             div(eventSource),
@@ -178,33 +197,43 @@
 
         const LogTable = () =>
           div(
-            div(
-              { class: "" },
+            van.derive(() =>
               div(
-                { class: "log-grid" },
-                div({ class: "pl-2" }, "time"),
-                div("level"),
-                div("source"),
-                div("msg")
+                // Table headers
+                div(
+                  { class: "log-grid" },
+                  div({ class: "pl-2" }, "time"),
+                  div("level"),
+                  div("source"),
+                  div("msg")
+                ),
+                // Render error message if it exists
+                error.val &&
+                  div(
+                    {
+                      style:
+                        "background-color: rgba(255, 0, 0, 0.1); padding: 10px; border-radius: 4px; margin-bottom: 10px; color: darkred; font-weight: bold; margin-top: 7px;",
+                    },
+                    `⚠️ Error: ${error.val}`
+                  ),
+                // Table body
+                (() => {
+                  const search = searchText.val.toLowerCase();
+                  const filteredLogs = logs.val.filter((log) => {
+                    const logLevel =
+                      LEVEL_MAP[log.level]?.label.toLowerCase() || "unknown";
+                    return JSON.stringify({ ...log, levelLabel: logLevel })
+                      .toLowerCase()
+                      .includes(search);
+                  });
+                  return div(
+                    filteredLogs.map((log) =>
+                      div({ key: log._id }, LogRow(log))
+                    )
+                  );
+                })()
               )
-            ),
-            van.derive(() => {
-              const search = searchText.val.toLowerCase();
-              const filteredLogs = logs.val.filter((log) => {
-                // a dumb way to preserver the lof filtering logic. This is done
-                // because the pretty level name is not in the response.
-                const logLevel =
-                  LEVEL_MAP[log.level]?.label.toLowerCase() || "unknown";
-
-                return JSON.stringify({ ...log, levelLabel: logLevel })
-                  .toLowerCase()
-                  .includes(search);
-              });
-
-              return div(
-                filteredLogs.map((log) => div({ key: log._id }, LogRow(log)))
-              );
-            })
+            )
           );
 
         const FilterForm = () =>
@@ -292,7 +321,6 @@
 
       // Mount and refresh
       van.add(document.body, LogsPage.View());
-      LogsPage.fetchLogs();
     </script>
     <style>
       .log-grid {
