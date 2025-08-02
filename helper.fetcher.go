@@ -18,14 +18,18 @@ type Request struct {
 	Body              []byte
 	ignoreStatusCodes bool
 	client            *http.Client // Optional custom HTTP client, if nil, default client will be used
+	errBodyLimit      *int         // Optional limit for error body size, if nil, no limit
 }
 
 func NewRequest(method, url string) *Request {
+	defaultErrBodyLimit := 1000
+
 	return &Request{
-		Method:  method,
-		URL:     url,
-		Headers: make(map[string]string),
-		client:  &http.Client{},
+		Method:       method,
+		URL:          url,
+		Headers:      make(map[string]string),
+		client:       &http.Client{},
+		errBodyLimit: &defaultErrBodyLimit, // Set default error body limit
 	}
 }
 
@@ -38,6 +42,12 @@ func (r *Request) WithBasicAuth(username, password string) *Request {
 	auth := fmt.Sprintf("%s:%s", username, password)
 	encoded := base64.StdEncoding.EncodeToString([]byte(auth))
 	r.Headers["Authorization"] = "Basic " + encoded
+	return r
+}
+
+// WithErrorBodyLimit sets a limit for the error body size. If nil, no limit is applied.
+func (r *Request) WithErrorBodyLimit(limit *int) *Request {
+	r.errBodyLimit = limit
 	return r
 }
 
@@ -109,23 +119,30 @@ func (r *Request) Do() (*Response, error) {
 		return nil, fmt.Errorf("error reading response body when fetching %v, status %v: %v, error: ", url, res.Status, err)
 	}
 
+	responseData := &Response{
+		Body:       body,
+		Header:     res.Header,
+		StatusCode: res.StatusCode,
+		RequestURL: r.URL,
+	}
+
 	if r.ignoreStatusCodes {
-		return &Response{body, res.Header, res.StatusCode, r.URL}, nil
+		return responseData, nil
 	}
 
 	if res.StatusCode != 200 && res.StatusCode != 201 && res.StatusCode != 202 {
 		bodyStr := ""
-		if body != nil {
-			bodyUpTo := min(len(body), 1000) // limit to x characters
+		if body != nil && r.errBodyLimit != nil {
+			bodyUpTo := min(len(body), *r.errBodyLimit) // limit to x characters
 			bodyStr = string(body[:bodyUpTo])
 		}
 
-		return nil, fmt.Errorf("response did not return status in 200 group while requesting %v, status: %v, body: %v", url, res.Status, bodyStr)
+		return responseData, fmt.Errorf("response did not return status in 200 group while requesting %v, status: %v, body: %v", url, res.Status, bodyStr)
 	}
 
 	if body == nil {
 		return nil, fmt.Errorf("response returned empty body while requesting %v", url)
 	}
 
-	return &Response{body, res.Header, res.StatusCode, r.URL}, err
+	return responseData, err
 }
