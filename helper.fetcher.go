@@ -56,6 +56,11 @@ func (r *Request) WithHeader(key, value string) *Request {
 	return r
 }
 
+func (r *Request) WithJsonHeader() *Request {
+	r.Headers["Content-Type"] = "application/json"
+	return r
+}
+
 func (r *Request) WithBody(body []byte) *Request {
 	r.Body = body
 	return r

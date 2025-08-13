@@ -18,8 +18,8 @@ type TimeseriesFilter struct {
 // Struct for grouping up / exposing query functions that use the interfaces
 type finder struct {
 	Logs           func(l Logger, maxLimit int64, urlPath string) ([]Log, error)
-	Crons          func(s CronStorage, urlPath string) ([]CronJob, error)
-	CronExecutions func(s CronStorage, urlPath string) ([]CronExecLog, error)
+	Crons          func(s CronStorage, maxLimit int64, urlPath string) ([]CronJob, error)
+	CronExecutions func(s CronStorage, maxLimit int64, urlPath string) ([]CronExecLog, error)
 }
 
 func Finder() finder {
@@ -109,7 +109,7 @@ func queryLogs(l Logger, maxLimit int64, urlPath string) ([]Log, error) {
 	return l.FindLogs(filter, maxLimit)
 }
 
-func queryCrons(s CronStorage, urlPath string) ([]CronJob, error) {
+func queryCrons(s CronStorage, maxLimit int64, urlPath string) ([]CronJob, error) {
 	if s == nil {
 		return nil, errors.New("storage is nil")
 	}
@@ -117,7 +117,7 @@ func queryCrons(s CronStorage, urlPath string) ([]CronJob, error) {
 	return s.FindCronJobs()
 }
 
-func queryCronExecutions(s CronStorage, urlPath string) ([]CronExecLog, error) {
+func queryCronExecutions(s CronStorage, maxLimit int64, urlPath string) ([]CronExecLog, error) {
 	if s == nil {
 		return nil, errors.New("storage is nil")
 	}
@@ -140,5 +140,5 @@ func queryCronExecutions(s CronStorage, urlPath string) ([]CronExecLog, error) {
 	filter.Source = params.Get("source")
 	filter.Name = params.Get("name")
 
-	return s.FindExecutions(filter)
+	return s.FindExecutions(filter, maxLimit)
 }

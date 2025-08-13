@@ -26,7 +26,7 @@ type CronStorage interface {
 	// RegisterExecution registers the execution of a job if the storage is specified
 	RegisterExecution(*CronExecLog) error
 	// FindExecutions returns a list of job executions that match the filter
-	FindExecutions(CronExecFilter) ([]CronExecLog, error)
+	FindExecutions(filter CronExecFilter, maxLimit int64) ([]CronExecLog, error)
 	// SetJobsToInactive updates the status of the jobs for the given source. Useful when the app exits.
 	SetJobsToInactive(source string) error
 }
@@ -202,6 +202,7 @@ type CronJob struct {
 }
 
 // CronExecLog stores information about the job execution
+// TODO: should this just be a syro.Log?
 type CronExecLog struct {
 	Source        string        `json:"source" bson:"source"`
 	Name          string        `json:"name" bson:"name"`

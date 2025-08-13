@@ -14,10 +14,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/robfig/cron/v3"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
+
+var ctx = context.Background()
 
 func TestLogger(t *testing.T) {
 	t.Run("test-log-creation", func(t *testing.T) {
@@ -191,7 +194,7 @@ func TestErrGroup(t *testing.T) {
 	})
 }
 
-func TestMongoLogger(t *testing.T) {
+func TestMongoImpl(t *testing.T) {
 
 	url := "mongodb://localhost:27017"
 
@@ -204,11 +207,34 @@ func TestMongoLogger(t *testing.T) {
 		SetMaxConnIdleTime(10 * time.Minute). // Close idle connections after the specified time
 		ApplyURI(url)
 
-	conn, err := mongo.Connect(context.Background(), opt)
+	conn, err := mongo.Connect(ctx, opt)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer conn.Disconnect(context.Background())
+	defer conn.Disconnect(ctx)
+
+	t.Run("cron-interface", func(t *testing.T) {
+		listColl := conn.Database(dbName).Collection("test_syro_cron")
+		if err := listColl.Drop(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		historyColl := conn.Database(dbName).Collection("test_syro_cron_history")
+		if err := historyColl.Drop(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		cron := cron.New()
+
+		store, err := NewMongoCronStorage(listColl, historyColl)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// check if the store implements the CronStorage interface
+		sched := NewCronScheduler(cron, "qweqw").WithStorage(store)
+		_ = sched
+	})
 
 	t.Run("test-bson-unmarshalling", func(t *testing.T) {
 		log := NewLog(ERROR, "qweqwe", "my-source", "my-event", "my-event-id")
@@ -249,7 +275,7 @@ func TestMongoLogger(t *testing.T) {
 	t.Run("test log creation", func(t *testing.T) {
 		coll := conn.Database(dbName).Collection("test_syro_mongo_logger")
 		// Remove the previous data
-		if err := coll.Drop(context.Background()); err != nil {
+		if err := coll.Drop(ctx); err != nil {
 			t.Fatal(err)
 		}
 
@@ -264,7 +290,7 @@ func TestMongoLogger(t *testing.T) {
 
 		// find the log in the collection
 		var log Log
-		if err := coll.FindOne(context.Background(), bson.M{}).Decode(&log); err != nil {
+		if err := coll.FindOne(ctx, bson.M{}).Decode(&log); err != nil {
 			t.Fatal(err)
 		}
 
@@ -300,7 +326,7 @@ func TestMongoLogger(t *testing.T) {
 
 	t.Run("test log fields", func(t *testing.T) {
 		coll := conn.Database(dbName).Collection("test_mongo_logger_with_fields")
-		if err := coll.Drop(context.Background()); err != nil {
+		if err := coll.Drop(ctx); err != nil {
 			t.Fatal(err)
 		}
 
@@ -317,7 +343,7 @@ func TestMongoLogger(t *testing.T) {
 		}
 
 		var log Log
-		if err := coll.FindOne(context.Background(), bson.M{}).Decode(&log); err != nil {
+		if err := coll.FindOne(ctx, bson.M{}).Decode(&log); err != nil {
 			t.Fatal(err)
 		}
 
@@ -344,7 +370,7 @@ func TestMongoLogger(t *testing.T) {
 	t.Run("test log creation", func(t *testing.T) {
 
 		coll := conn.Database(dbName).Collection("test_mongo_logger_with_source")
-		if err := coll.Drop(context.Background()); err != nil {
+		if err := coll.Drop(ctx); err != nil {
 			t.Fatal(err)
 		}
 
@@ -381,7 +407,7 @@ func TestMongoLogger(t *testing.T) {
 
 	t.Run("test find logs", func(t *testing.T) {
 		coll := conn.Database(dbName).Collection("test_mongo_logger_find_logs")
-		if err := coll.Drop(context.Background()); err != nil {
+		if err := coll.Drop(ctx); err != nil {
 			t.Fatal(err)
 		}
 
