@@ -7,6 +7,7 @@ import (
 	"io"
 	"maps"
 	"net/http"
+	"time"
 )
 
 // NOTE: util method which can generate a curl request for easier sharing of requests
@@ -21,6 +22,15 @@ type Request struct {
 	errBodyLimit      *int         // Optional limit for error body size, if nil, no limit
 }
 
+type Response struct {
+	Request    *Request
+	Body       []byte
+	Header     http.Header
+	StatusCode int
+	RequestURL string // The URL that was requested
+	Duration   time.Duration
+}
+
 func NewRequest(method, url string) *Request {
 	defaultErrBodyLimit := 1000
 
@@ -29,7 +39,7 @@ func NewRequest(method, url string) *Request {
 		URL:          url,
 		Headers:      make(map[string]string),
 		client:       &http.Client{},
-		errBodyLimit: &defaultErrBodyLimit, // Set default error body limit
+		errBodyLimit: &defaultErrBodyLimit,
 	}
 }
 
@@ -71,21 +81,16 @@ func (r *Request) WithIgnoreStatusCodes(ignore bool) *Request {
 	return r
 }
 
-func (r *Request) WithClient(client *http.Client) *Request {
-	if client != nil {
-		r.client = client
+func (r *Request) WithClient(c *http.Client) *Request {
+	if c != nil {
+		r.client = c
 	}
 	return r
 }
 
-type Response struct {
-	Body       []byte
-	Header     http.Header
-	StatusCode int
-	RequestURL string // The URL that was requested
-}
-
 func (r *Request) Do() (*Response, error) {
+
+	now := time.Now()
 
 	url := r.URL
 
@@ -119,16 +124,20 @@ func (r *Request) Do() (*Response, error) {
 	}
 	defer res.Body.Close()
 
+	dur := time.Since(now)
+
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		return nil, fmt.Errorf("error reading response body when fetching %v, status %v: %v, error: ", url, res.Status, err)
 	}
 
 	responseData := &Response{
-		Body:       body,
-		Header:     res.Header,
 		StatusCode: res.StatusCode,
+		Header:     res.Header,
 		RequestURL: r.URL,
+		Body:       body,
+		Duration:   dur,
+		Request:    r,
 	}
 
 	if r.ignoreStatusCodes {
@@ -146,8 +155,81 @@ func (r *Request) Do() (*Response, error) {
 	}
 
 	if body == nil {
-		return nil, fmt.Errorf("response returned empty body while requesting %v", url)
+		return responseData, fmt.Errorf("response returned empty body while requesting %v", url)
 	}
 
-	return responseData, err
+	return responseData, nil
+}
+
+func (r *Request) AsCURL() string {
+	var buf bytes.Buffer
+
+	buf.WriteString("curl")
+
+	hasOptions := false
+
+	// Add method if not GET
+	if r.Method != "" && r.Method != "GET" {
+		buf.WriteString(fmt.Sprintf(" -X %s \\\n", r.Method))
+		hasOptions = true
+	}
+
+	// Add headers
+	for k, v := range r.Headers {
+		buf.WriteString(fmt.Sprintf("  -H '%s: %s' \\\n", k, v))
+		hasOptions = true
+	}
+
+	// Add body if present
+	if len(r.Body) > 0 {
+		// Escape single quotes in the body
+		b := bytes.ReplaceAll(r.Body, []byte("'"), []byte("'\\''"))
+		buf.WriteString(fmt.Sprintf("  -d '%s' \\\n", string(b)))
+		hasOptions = true
+	}
+
+	// Add URL (always last, no trailing backslash)
+	if hasOptions {
+		buf.WriteString(fmt.Sprintf("  \"%s\"", r.URL))
+	} else {
+		buf.WriteString(fmt.Sprintf(" \"%s\"", r.URL))
+	}
+
+	return buf.String()
+}
+
+func (r *Response) Prettified() string {
+	buf := bytes.Buffer{}
+
+	buf.WriteString(fmt.Sprintf("Status: %d\n", r.StatusCode))
+	buf.WriteString(fmt.Sprintf("Duration: %v\n", r.Duration))
+
+	buf.WriteString("Headers:\n")
+	for k, v := range r.Header {
+		buf.WriteString(fmt.Sprintf("  %s: %s\n", k, v))
+	}
+	buf.WriteString("\n")
+
+	if r.Body != nil {
+		buf.WriteString("Body:\n\n")
+		buf.Write(r.Body)
+		buf.WriteString("\n")
+	}
+
+	return buf.String()
+}
+
+func (r *Response) Info() string {
+
+	buf := bytes.Buffer{}
+
+	buf.WriteString("# Request \n\n")
+	buf.WriteString(r.Request.AsCURL())
+	buf.WriteString("\n\n")
+
+	buf.WriteString("# Response \n\n")
+
+	buf.WriteString(r.Prettified())
+
+	return buf.String()
 }

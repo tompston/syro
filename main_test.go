@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -557,6 +558,15 @@ func TestRequest(t *testing.T) {
 		}
 	})
 
+	t.Run("request-curl-examples", func(t *testing.T) {
+		t.Run("simple-get", func(t *testing.T) {
+			req := NewRequest("POST", "http://example.com").
+				WithHeader("X-Test", "123")
+			curl := req.AsCURL()
+			fmt.Printf("%v\n", curl)
+		})
+	})
+
 	t.Run("with-ignore-status-codes", func(t *testing.T) {
 		req := NewRequest("GET", "http://example.com").WithIgnoreStatusCodes(true)
 		if !req.ignoreStatusCodes {
@@ -624,6 +634,54 @@ func TestRequest(t *testing.T) {
 		if err == nil || !contains(err.Error(), "status: 418") {
 			t.Errorf("expected status error, got: %v", err)
 		}
+	})
+}
+
+func TestRequestsWithMockServer(t *testing.T) {
+
+	// Create a simple echo server that reflects request data
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		// Read the request body
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("error reading body: %v", err)
+		}
+		defer r.Body.Close()
+
+		// Build response that reflects the request
+		response := map[string]any{
+			"method":  r.Method,
+			"path":    r.URL.Path,
+			"query":   r.URL.RawQuery,
+			"headers": r.Header,
+		}
+
+		// Include body if present
+		if len(body) > 0 {
+			response["body"] = string(body)
+			// Try to parse as JSON
+			var jsonBody any
+			if err := json.Unmarshal(body, &jsonBody); err == nil {
+				response["body_parsed"] = jsonBody
+			}
+		}
+
+		json.NewEncoder(w).Encode(response)
+	}))
+	defer server.Close()
+
+	url := server.URL
+
+	t.Run("simple-get", func(t *testing.T) {
+		res, err := NewRequest("GET", url).WithHeader("X-Test", "123").Do()
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		fmt.Printf("res.Body: %v\n", string(res.Body))
+
+		fmt.Printf("%v\n", res.Info())
 	})
 }
 
