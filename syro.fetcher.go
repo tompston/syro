@@ -3,10 +3,12 @@ package syro
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"maps"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -27,7 +29,6 @@ type Response struct {
 	Body       []byte
 	Header     http.Header
 	StatusCode int
-	RequestURL string // The URL that was requested
 	Duration   time.Duration
 }
 
@@ -134,7 +135,6 @@ func (r *Request) Do() (*Response, error) {
 	responseData := &Response{
 		StatusCode: res.StatusCode,
 		Header:     res.Header,
-		RequestURL: r.URL,
 		Body:       body,
 		Duration:   dur,
 		Request:    r,
@@ -221,15 +221,48 @@ func (r *Response) Prettified() string {
 
 func (r *Response) Info() string {
 
-	buf := bytes.Buffer{}
+	formatBody := func(data []byte) string {
+		var obj any
+		if err := json.Unmarshal(data, &obj); err != nil {
+			return string(data)
+		}
+		pretty, err := json.MarshalIndent(obj, "", "  ")
+		if err != nil {
+			return string(data)
+		}
+		return string(pretty)
+	}
 
-	buf.WriteString("# Request \n\n")
-	buf.WriteString(r.Request.AsCURL())
-	buf.WriteString("\n\n")
+	var sb strings.Builder
 
-	buf.WriteString("# Response \n\n")
+	// Request section
+	sb.WriteString("┌─ REQUEST ─────────────────────────────────────────────\n")
+	sb.WriteString(r.Request.AsCURL())
+	sb.WriteString("\n")
+	sb.WriteString("└───────────────────────────────────────────────────────\n\n")
 
-	buf.WriteString(r.Prettified())
+	// Response section
+	sb.WriteString("┌─ RESPONSE ────────────────────────────────────────────\n")
+	sb.WriteString(fmt.Sprintf("│ Status: %d\n", r.StatusCode))
+	sb.WriteString(fmt.Sprintf("│ Duration: %v\n", r.Duration))
 
-	return buf.String()
+	// Headers
+	if len(r.Header) > 0 {
+		sb.WriteString("│\n│ Headers:\n")
+		for key, values := range r.Header {
+			sb.WriteString(fmt.Sprintf("│   %s: %s\n", key, strings.Join(values, ", ")))
+		}
+	}
+
+	// Body
+	sb.WriteString("│\n│ Body:\n")
+	bodyStr := formatBody(r.Body)
+	for _, line := range strings.Split(bodyStr, "\n") {
+		if line != "" {
+			sb.WriteString("│   " + line + "\n")
+		}
+	}
+	sb.WriteString("└───────────────────────────────────────────────────────\n")
+
+	return sb.String()
 }

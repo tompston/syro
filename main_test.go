@@ -688,3 +688,87 @@ func TestRequestsWithMockServer(t *testing.T) {
 func contains(s, substr string) bool {
 	return bytes.Contains([]byte(s), []byte(substr))
 }
+
+func TestExecFuncs(t *testing.T) {
+	alwaysOK := func() error { return nil }
+	alwaysErr := func() error { return errors.New("fail") }
+
+	// helper to generate repeated function slices
+	repeat := func(fn func() error, n int) []func() error {
+		funcs := make([]func() error, n)
+		for i := 0; i < n; i++ {
+			funcs[i] = fn
+		}
+		return funcs
+	}
+
+	tests := []struct {
+		name        string
+		funcs       []func() error
+		parallelism int
+		handling    ErrorHandlingOption
+		wantErrs    int  // number of errors expected
+		wantNil     bool // if we expect the result to be nil (e.g. ReturnNoneIfAnyError and any error occurs)
+	}{
+		{
+			name:        "all pass - collect all",
+			funcs:       repeat(alwaysOK, 5),
+			parallelism: 2,
+			handling:    ExecFuncCollectAllErrors,
+			wantErrs:    0,
+		},
+		{
+			name:        "some fail - collect all",
+			funcs:       append(repeat(alwaysOK, 3), repeat(alwaysErr, 2)...),
+			parallelism: 3,
+			handling:    ExecFuncCollectAllErrors,
+			wantErrs:    2,
+		},
+		{
+			name:        "first fails - break on first",
+			funcs:       append([]func() error{alwaysErr}, repeat(alwaysOK, 4)...),
+			parallelism: 2,
+			handling:    ExecFuncBreakOnFirstError,
+			wantErrs:    1,
+		},
+		{
+			name:        "some fail - return none if any",
+			funcs:       append(repeat(alwaysOK, 4), alwaysErr),
+			parallelism: 3,
+			handling:    ExecFuncReturnNoneIfAnyError,
+			wantNil:     true,
+		},
+		{
+			name:        "all fail - ignore all",
+			funcs:       repeat(alwaysErr, 5),
+			parallelism: 2,
+			handling:    ExecFuncIgnoreAllErrors,
+			wantErrs:    0,
+		},
+		{
+			name:        "negative parallelism - collect all",
+			funcs:       repeat(alwaysErr, 3),
+			parallelism: -1,
+			handling:    ExecFuncCollectAllErrors,
+			wantErrs:    3,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			start := time.Now()
+			errs := ExecFuncs(tt.funcs, tt.parallelism, tt.handling)
+			elapsed := time.Since(start)
+
+			if tt.wantNil && errs != nil {
+				t.Errorf("expected nil result, got %v", errs)
+			}
+			if !tt.wantNil && len(errs) != tt.wantErrs {
+				t.Errorf("expected %d errors, got %d: %v", tt.wantErrs, len(errs), errs)
+			}
+
+			// Print timing info to verify parallelism roughly works
+			fmt.Printf("[%s] Took %s\n", tt.name, elapsed)
+		})
+	}
+}

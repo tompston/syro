@@ -15,12 +15,15 @@ import (
 
 func main() {
 	ExposeTestServer()
+
 }
 
 const (
 	dbName = "test"
 	apiUrl = "localhost:3094"
 )
+
+var ctx = context.Background()
 
 func setupConn() (*mongo.Client, error) {
 	url := "mongodb://localhost:27017"
@@ -30,13 +33,13 @@ func setupConn() (*mongo.Client, error) {
 		SetMaxConnIdleTime(10 * time.Minute). // Close idle connections after the specified time
 		ApplyURI(url)
 
-	// conn, err := mongo.Connect(context.Background(), opt)
+	// conn, err := mongo.Connect(ctx, opt)
 	// if err != nil {
 	// 	return nil, err
 	// }
-	// defer conn.Disconnect(context.Background())
+	// defer conn.Disconnect(ctx)
 
-	return mongo.Connect(context.Background(), opt)
+	return mongo.Connect(ctx, opt)
 }
 
 func ExposeTestServer() {
@@ -45,7 +48,7 @@ func ExposeTestServer() {
 	if err != nil {
 		log.Fatalf("failed to connect to MongoDB: %v", err)
 	}
-	defer conn.Disconnect(context.Background())
+	defer conn.Disconnect(ctx)
 
 	coll := conn.Database(dbName).Collection("test_collection_logs")
 	logger := syro.NewMongoLogger(coll, nil)
@@ -114,8 +117,8 @@ func startRandomLogging(logger *syro.MongoLogger) {
 }
 
 func GenerateRandomLogFields(n int) syro.LogFields {
-	var letters = []rune("abcdefghijklmnopqrstuvwxyz")
-	var words = []string{
+	letters := []rune("abcdefghijklmnopqrstuvwxyz")
+	words := []string{
 		"foo", "bar", "baz", "qux", "lorem", "ipsum", "dolor", "sit", "amet", "consectetur",
 	}
 
@@ -123,7 +126,7 @@ func GenerateRandomLogFields(n int) syro.LogFields {
 		if long {
 			n := 5 + rand.Intn(10)
 			s := ""
-			for i := 0; i < n; i++ {
+			for range n {
 				s += words[rand.Intn(len(words))] + " "
 			}
 			return s
@@ -163,7 +166,7 @@ func GenerateRandomLogFields(n int) syro.LogFields {
 	}
 
 	logFields := make(syro.LogFields)
-	for i := 0; i < n; i++ {
+	for range n {
 		key := randomKey(3 + rand.Intn(3)) // 3-5 chars
 		logFields[key] = randomValue()
 	}
