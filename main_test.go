@@ -134,7 +134,7 @@ func TestErrGroup(t *testing.T) {
 			t.Fatal("New() should not return nil")
 		}
 
-		if len(eg.Errors) != 0 {
+		if len(eg.Errors()) != 0 {
 			t.Fatal("New() should initialize an empty ErrGroup")
 		}
 	})
@@ -145,17 +145,17 @@ func TestErrGroup(t *testing.T) {
 		err2 := errors.New("second error")
 
 		eg.Add(err1)
-		if len(eg.Errors) != 1 {
+		if len(eg.Errors()) != 1 {
 			t.Fatal("Add() did not properly add the first error")
 		}
 
 		eg.Add(err2)
-		if len(eg.Errors) != 2 {
+		if len(eg.Errors()) != 2 {
 			t.Fatal("Add() did not properly add the second error")
 		}
 
 		eg.Add(nil) // test adding nil error
-		if len(eg.Errors) != 2 {
+		if len(eg.Errors()) != 2 {
 			t.Fatal("Add() should not add nil errors")
 		}
 	})
@@ -681,7 +681,7 @@ func TestRequestsWithMockServer(t *testing.T) {
 		}
 		fmt.Printf("res.Body: %v\n", string(res.Body))
 
-		fmt.Printf("%v\n", res.Info())
+		fmt.Printf("%v\n", res.Inspect())
 	})
 }
 

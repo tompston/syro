@@ -12,16 +12,14 @@ import (
 	"time"
 )
 
-// NOTE: util method which can generate a curl request for easier sharing of requests
-// NOTE: maybe rename this to Fetch or Curl ?
 type Request struct {
 	Method            string
 	URL               string
 	Headers           map[string]string
 	Body              []byte
 	ignoreStatusCodes bool
-	client            *http.Client // Optional custom HTTP client, if nil, default client will be used
-	errBodyLimit      *int         // Optional limit for error body size, if nil, no limit
+	client            *http.Client // Optional custom HTTP client. If nil, default client will be used
+	errBodyLimit      *int         // Optional limit for the returned body size on error. If nil, no limit
 }
 
 type Response struct {
@@ -91,8 +89,6 @@ func (r *Request) WithClient(c *http.Client) *Request {
 
 func (r *Request) Do() (*Response, error) {
 
-	now := time.Now()
-
 	url := r.URL
 
 	if r.Method == "" {
@@ -117,9 +113,9 @@ func (r *Request) Do() (*Response, error) {
 		req.Header.Set(k, v)
 	}
 
-	client := r.client
+	now := time.Now()
 
-	res, err := client.Do(req)
+	res, err := r.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching %v : %v", r.URL, err)
 	}
@@ -219,7 +215,7 @@ func (r *Response) Prettified() string {
 	return buf.String()
 }
 
-func (r *Response) Info() string {
+func (r *Response) Inspect() string {
 
 	formatBody := func(data []byte) string {
 		var obj any

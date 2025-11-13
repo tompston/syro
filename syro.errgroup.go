@@ -8,36 +8,42 @@ import (
 // could have multiple errors which should be accumulated,
 // instead of returning the first one.
 type ErrGroup struct {
-	Errors []error
-	Props  *ErrGroupProps
-}
-
-type ErrGroupProps struct {
+	errors      []error
 	ID          string
-	WithNewline bool
+	withNewline bool
 }
 
-func NewErrGroup(ep ...ErrGroupProps) *ErrGroup {
-	eg := &ErrGroup{
-		Errors: make([]error, 0),
+func NewErrGroup() *ErrGroup {
+	return &ErrGroup{
+		errors:      make([]error, 0),
+		withNewline: false,
+		ID:          "",
 	}
+}
 
-	if len(ep) == 1 {
-		eg.Props = &ep[0]
+func (eg *ErrGroup) WithID(id string) *ErrGroup {
+	if eg != nil {
+		eg.ID = id
 	}
+	return eg
+}
 
+func (eg *ErrGroup) WithNewline(v bool) *ErrGroup {
+	if eg != nil {
+		eg.withNewline = v
+	}
 	return eg
 }
 
 func (eg *ErrGroup) Add(err error) {
 	if eg != nil && err != nil {
-		eg.Errors = append(eg.Errors, err)
+		eg.errors = append(eg.errors, err)
 	}
 }
 
-func (eg *ErrGroup) GetErrors() []error {
+func (eg *ErrGroup) Errors() []error {
 	if eg != nil {
-		return eg.Errors
+		return eg.errors
 	}
 
 	return nil
@@ -48,25 +54,27 @@ func (eg *ErrGroup) GetErrors() []error {
 //
 // TODO: write tests for this method
 func (eg *ErrGroup) Error() string {
-	if eg == nil || len(eg.Errors) == 0 {
+	if eg == nil {
 		return ""
 	}
 
-	propsExist := eg.Props != nil
+	if len(eg.errors) == 0 {
+		return ""
+	}
 
 	sb := strings.Builder{}
-	if propsExist && eg.Props.ID != "" {
-		sb.WriteString(eg.Props.ID)
+	if eg.ID != "" {
+		sb.WriteString(eg.ID)
 		sb.WriteString(": ")
 	}
 
 	// Track whether we’ve written any errors (for semicolon separation)
 	first := true
-	for _, err := range eg.Errors {
+	for _, err := range eg.errors {
 		if err != nil {
 			if !first {
 				sb.WriteString("; ")
-				if propsExist && eg.Props.WithNewline {
+				if eg.withNewline {
 					sb.WriteString("\n")
 				}
 			}
@@ -83,7 +91,7 @@ func (eg *ErrGroup) Len() int {
 		return 0
 	}
 
-	return len(eg.Errors)
+	return len(eg.errors)
 }
 
 // Return the error only if at least one of them happened. This is done because
