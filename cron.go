@@ -62,7 +62,6 @@ func (c *CronScheduler) Storage() (CronStorage, error) {
 	if c.storage == nil {
 		return nil, fmt.Errorf("storage is nil")
 	}
-
 	return c.storage, nil
 }
 

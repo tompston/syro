@@ -9,7 +9,7 @@ This includes
 - structured logging, based around interfaces (with implementation for console and mongodb logger)
 - wrapper around `robfig/cron/v3` cron job scheduler with
   - locked execution (next cron won't trigger if previous has not finished)
-  - optional `OnError`, `OnComplete` callbacks
+  - optional `OnComplete` callback when the function executes
   - optional storage specifier for cron job list and executions (NOT FINISHED)
 - error group: accumulate errors under a single struct
 - http request util for making requests in a simple way
