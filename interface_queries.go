@@ -31,17 +31,18 @@ func NewQueryHandler() QueryHandler {
 
 			// Extract query parameters
 			params := parsedURL.Query()
-			filter := LogFilter{}
 
 			ts, err := parseUrlToTimeseriesParams(params)
 			if err != nil {
 				return nil, err
 			}
 
-			filter.TimeseriesFilter = *ts
-			filter.Source = params.Get("source")
-			filter.Event = params.Get("event")
-			filter.EventID = params.Get("event_id")
+			filter := LogFilter{
+				TimeseriesFilter: *ts,
+				Source:           params.Get("source"),
+				Event:            params.Get("event"),
+				EventID:          params.Get("event_id"),
+			}
 
 			if parsedLevel, err := strconv.Atoi(params.Get("level")); err == nil {
 				logLevel := LogLevel(parsedLevel)
@@ -74,15 +75,16 @@ func NewQueryHandler() QueryHandler {
 			// Extract query parameters
 			params := parsedURL.Query()
 
-			filter := CronExecFilter{}
 			ts, err := parseUrlToTimeseriesParams(params)
 			if err != nil {
 				return nil, err
 			}
 
-			filter.TimeseriesFilter = *ts
-			filter.Source = params.Get("source")
-			filter.Name = params.Get("name")
+			filter := CronExecFilter{
+				TimeseriesFilter: *ts,
+				Source:           params.Get("source"),
+				Name:             params.Get("name"),
+			}
 
 			return s.FindExecutions(filter, maxLimit)
 		},
