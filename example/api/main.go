@@ -15,7 +15,6 @@ import (
 
 func main() {
 	ExposeTestServer()
-
 }
 
 const (
@@ -75,15 +74,13 @@ func RandomInt(min, max int) int {
 }
 
 func startServer(logger *syro.MongoLogger) {
-	finder := syro.Finder()
-
 	http.HandleFunc("GET /logs", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Credentials", "false")
 		w.Header().Set("Content-Type", "application/json")
 
 		const maxLimit = 1000
-		data, err := finder.Logs(logger, maxLimit, r.URL.String())
+		data, err := syro.Query().Logs(logger, maxLimit, r.URL.String())
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -141,6 +138,7 @@ func GenerateRandomLogFields(n int) syro.LogFields {
 		switch choice {
 		case 0:
 			return randomStringValue(long)
+
 		case 1:
 			if long {
 				return rand.Intn(10000)

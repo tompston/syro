@@ -40,7 +40,7 @@ func (lb *LogBuffer) Reset() {
 
 // ToFile returns the accumulated log contents as []byte,
 // and clears the in-memory buffer (thread-safe).
-func (lb *LogBuffer) ToFile() []byte {
+func (lb *LogBuffer) ToBytes() []byte {
 	lb.mu.Lock()
 	defer lb.mu.Unlock()
 
@@ -50,7 +50,7 @@ func (lb *LogBuffer) ToFile() []byte {
 }
 
 func (lb *LogBuffer) ToZip(filename string) ([]byte, error) {
-	fileBytes := lb.ToFile()
+	fileBytes := lb.ToBytes()
 
 	var buf bytes.Buffer
 	zw := zip.NewWriter(&buf)

@@ -232,33 +232,31 @@ func (r *Response) Inspect() string {
 	var sb strings.Builder
 
 	// Request section
-	sb.WriteString("┌─ REQUEST ─────────────────────────────────────────────\n")
+	sb.WriteString("───── REQUEST ─────────────────────────\n")
 	sb.WriteString(r.Request.AsCURL())
-	sb.WriteString("\n")
-	sb.WriteString("└───────────────────────────────────────────────────────\n\n")
+	sb.WriteString("\n\n")
 
 	// Response section
-	sb.WriteString("┌─ RESPONSE ────────────────────────────────────────────\n")
-	sb.WriteString(fmt.Sprintf("│ Status: %d\n", r.StatusCode))
-	sb.WriteString(fmt.Sprintf("│ Duration: %v\n", r.Duration))
+	sb.WriteString("───── RESPONSE ────────────────────────\n")
+	sb.WriteString(fmt.Sprintf("Status: %d\n", r.StatusCode))
+	sb.WriteString(fmt.Sprintf("Duration: %v\n", r.Duration))
 
 	// Headers
 	if len(r.Header) > 0 {
-		sb.WriteString("│\n│ Headers:\n")
+		sb.WriteString("\nHeaders:\n")
 		for key, values := range r.Header {
-			sb.WriteString(fmt.Sprintf("│   %s: %s\n", key, strings.Join(values, ", ")))
+			sb.WriteString(fmt.Sprintf("  %s: %s\n", key, strings.Join(values, ", ")))
 		}
 	}
 
 	// Body
-	sb.WriteString("│\n│ Body:\n")
+	sb.WriteString("\nBody:\n")
 	bodyStr := formatBody(r.Body)
 	for _, line := range strings.Split(bodyStr, "\n") {
 		if line != "" {
-			sb.WriteString("│   " + line + "\n")
+			sb.WriteString("   " + line + "\n")
 		}
 	}
-	sb.WriteString("└───────────────────────────────────────────────────────\n")
 
 	return sb.String()
 }

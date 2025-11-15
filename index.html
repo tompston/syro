@@ -311,7 +311,7 @@
           div(
             {
               class:
-                "grid w-full grid-cols-[240px_1fr] bg-stone-700 text-white",
+                "grid w-full grid-cols-[240px_1fr] text-white",
             },
             div(
               {
@@ -339,9 +339,11 @@
       van.add(document.body, LogsPage.View());
     </script>
     <style>
+
+
       .log-grid {
         display: grid;
-        grid-template-columns: 180px 70px 150px 1fr;
+        grid-template-columns: 170px 70px 150px 1fr;
         gap: 0.5em;
       }
 
@@ -404,7 +406,6 @@
       }
 
       .log-error {
-        /* color: rgb(50, 46, 46); */
         color: rgb(42, 39, 39);
         background: rgb(251, 173, 173);
       }
@@ -420,5 +421,5 @@
       }
     </style>
   </head>
-  <body class="w-full h-full"></body>
+  <body class="w-full h-full bg-stone-700 "></body>
 </html>

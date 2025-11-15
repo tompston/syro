@@ -679,7 +679,7 @@ func TestRequestsWithMockServer(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		fmt.Printf("res.Body: %v\n", string(res.Body))
+		// fmt.Printf("res.Body: %v\n", string(res.Body))
 
 		fmt.Printf("%v\n", res.Inspect())
 	})
