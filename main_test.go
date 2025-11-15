@@ -43,7 +43,7 @@ func TestLogger(t *testing.T) {
 		t.Run("test-json-unmarshalling", func(t *testing.T) {
 			if err := stringIncludes(jsonStr, []string{
 				`"level":5`,
-				`message":"qweqwe"`,
+				`msg":"qweqwe"`,
 				`"source":"my-source"`,
 				`"event":"my-event"`,
 				`"event_id":"my-event-id"`,
@@ -250,7 +250,7 @@ func TestMongoImpl(t *testing.T) {
 
 		if err := stringIncludes(bsonStr, []string{
 			`"ts":{"$date":`,
-			`message":"qweqwe"`,
+			`msg":"qweqwe"`,
 			`"source":"my-source"`,
 			`"event":"my-event"`,
 			`"event_id":"my-event-id"`,

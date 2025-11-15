@@ -172,7 +172,7 @@
             div(eventSource),
             div(
               // { style: "display:flex;" },
-              div(log.message || ""),
+              div(log.msg || ""),
               div(
                 { style: "display:flex; gap:3px; flex-wrap: wrap;" },
                 Object.entries(sortedFields).map(([key, value]) =>

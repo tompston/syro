@@ -25,7 +25,7 @@ func NewMongoLogger(coll *mongo.Collection, settings *LoggerSettings) *MongoLogg
 }
 
 func (lg *MongoLogger) CreateIndexes() error {
-	return newMongoIndexes().
+	return NewMongoIndexes().
 		Add("ts", "level").
 		Add("source", "event").
 		Add("event_id").
@@ -72,9 +72,9 @@ func (lg *MongoLogger) Log(level LogLevel, msg string, lf ...LogFields) error {
 	// the field has a string type.
 
 	set := bson.M{
-		"ts":      log.Timestamp,
-		"level":   log.Level,
-		"message": log.Message,
+		"ts":    log.Timestamp,
+		"level": log.Level,
+		"msg":   log.Message,
 	}
 
 	if log.Source != "" {
@@ -188,7 +188,7 @@ func NewMongoCronStorage(cronListColl, cronHistoryColl *mongo.Collection) (*Mong
 
 func (m *MongoCronStorage) CreateIndexes() error {
 	// Create indexes for the collections
-	if err := newMongoIndexes().
+	if err := NewMongoIndexes().
 		Add("source", "name").
 		Add("status").
 		Create(m.cronListColl); err != nil {
@@ -196,7 +196,7 @@ func (m *MongoCronStorage) CreateIndexes() error {
 	}
 
 	// Create indexes for the collections
-	if err := newMongoIndexes().
+	if err := NewMongoIndexes().
 		Add("source", "name").
 		Add("initialized_at").
 		Create(m.cronHistoryColl); err != nil {
@@ -326,15 +326,15 @@ var mongoUpsertOpt = options.Update().SetUpsert(true)
 
 // mongoIndexBuilder is a helper for creating indexes for a MongoDB collection
 // in a more reusable way.
-type mongoIndexBuilder struct {
+type MongoIndexBuilder struct {
 	indexes []mongo.IndexModel
 }
 
-func newMongoIndexes() *mongoIndexBuilder { return &mongoIndexBuilder{} }
+func NewMongoIndexes() *MongoIndexBuilder { return &MongoIndexBuilder{} }
 
 // Add adds a new index to the mongoIndexBuilder. It supports both single and compound
 // indexes. All indexes are created in descending order.
-func (ib *mongoIndexBuilder) Add(keys ...string) *mongoIndexBuilder {
+func (ib *MongoIndexBuilder) Add(keys ...string) *MongoIndexBuilder {
 	indexKeys := bson.D{}
 	for _, key := range keys {
 		indexKeys = append(indexKeys, bson.E{Key: key, Value: -1})
@@ -345,7 +345,7 @@ func (ib *mongoIndexBuilder) Add(keys ...string) *mongoIndexBuilder {
 }
 
 // Create creates all the indexes that have been added to the mongoIndexBuilder.
-func (ib *mongoIndexBuilder) Create(coll *mongo.Collection) error {
+func (ib *MongoIndexBuilder) Create(coll *mongo.Collection) error {
 	if ib == nil {
 		return fmt.Errorf("ib is nil")
 	}

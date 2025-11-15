@@ -29,7 +29,7 @@ type Logger interface {
 type Log struct {
 	Timestamp time.Time `json:"ts" bson:"ts"`                                 // Time of the log (UTC)
 	ID        string    `json:"_id" bson:"_id"`                               // (not logged to the console)
-	Message   string    `json:"message" bson:"message"`                       // Logged message
+	Message   string    `json:"msg" bson:"msg"`                               // Logged message
 	Source    string    `json:"source,omitempty" bson:"source,omitempty"`     // Source of the log (api, pooler, etc.)
 	Event     string    `json:"event,omitempty" bson:"event,omitempty"`       // Event of the log (api-auth-request, binance-eth-pooler, etc.)
 	EventID   string    `json:"event_id,omitempty" bson:"event_id,omitempty"` // (not logged to the console)
