@@ -12,10 +12,22 @@ import (
 // registration of jobs and the optional storage of job status and
 // execution logs using the CronStorage interface.
 type CronScheduler struct {
-	cron        *cron.Cron  // cron is the cron CronScheduler which will run the jobs
-	Source      string      // Source is used to identify the source of the job
-	Jobs        []*Job      // Jobs is a list of all registered jobs
-	CronStorage CronStorage // Storage is an optional storage interface for the CronScheduler
+	cron    *cron.Cron  // cron is the cron CronScheduler which will run the jobs
+	Source  string      // Source is used to identify the source of the job
+	Jobs    []*Job      // Jobs is a list of all registered jobs
+	storage CronStorage // storage is an optional storage interface for the CronScheduler (unexported, so that can be accesed with a safe method)
+}
+
+func (c *CronScheduler) Storage() (CronStorage, error) {
+	if c == nil {
+		return nil, fmt.Errorf("CronScheduler is nil")
+	}
+
+	if c.storage == nil {
+		return nil, fmt.Errorf("storage is nil")
+	}
+
+	return c.storage, nil
 }
 
 type CronStorage interface {
@@ -37,7 +49,7 @@ func NewCronScheduler(cron *cron.Cron, source string) *CronScheduler {
 
 // WithStorage sets the storage for the CronScheduler.
 func (s *CronScheduler) WithStorage(storage CronStorage) *CronScheduler {
-	s.CronStorage = storage
+	s.storage = storage
 	return s
 }
 
@@ -86,7 +98,7 @@ func (s *CronScheduler) Register(j *Job) error {
 		}
 	}
 
-	storageSpecified := s.CronStorage != nil
+	storageSpecified := s.storage != nil
 	loggerSpecified := j.Logger != nil
 
 	// NOTE: there is a slight inefficiency in the data that is written by
@@ -94,7 +106,7 @@ func (s *CronScheduler) Register(j *Job) error {
 	// written each time in order to update the status.
 
 	if storageSpecified {
-		if err := s.CronStorage.RegisterJob(source, name, schedule, descr, JobStatusInitialized, nil); err != nil {
+		if err := s.storage.RegisterJob(source, name, schedule, descr, JobStatusInitialized, nil); err != nil {
 			return err
 		}
 	}
@@ -105,7 +117,7 @@ func (s *CronScheduler) Register(j *Job) error {
 		// Accumulate errors in the c.AddJob function, because the cron.Job param does not return anything
 
 		if storageSpecified {
-			if err := s.CronStorage.RegisterJob(s.Source, name, schedule, descr, JobStatusRunning, nil); err != nil {
+			if err := s.storage.RegisterJob(s.Source, name, schedule, descr, JobStatusRunning, nil); err != nil {
 				if loggerSpecified {
 					j.Logger.Error("failed to set job to running", LogFields{
 						"source": source,
@@ -128,7 +140,7 @@ func (s *CronScheduler) Register(j *Job) error {
 		}
 
 		if storageSpecified {
-			if err := s.CronStorage.RegisterExecution(newCronExecutionLog(source, name, jobStart, jobErr)); err != nil {
+			if err := s.storage.RegisterExecution(newCronExecutionLog(source, name, jobStart, jobErr)); err != nil {
 				if loggerSpecified {
 					j.Logger.Error("failed to register execution", LogFields{
 						"source": source,
@@ -138,7 +150,7 @@ func (s *CronScheduler) Register(j *Job) error {
 				}
 			}
 
-			if err := s.CronStorage.RegisterJob(s.Source, name, schedule, descr, JobStatusDone, jobErr); err != nil {
+			if err := s.storage.RegisterJob(s.Source, name, schedule, descr, JobStatusDone, jobErr); err != nil {
 				if loggerSpecified {
 					j.Logger.Error("failed to set job to done", LogFields{
 						"source": source,

@@ -901,3 +901,72 @@ func TestLogBuffer(t *testing.T) {
 		}
 	})
 }
+
+func TestAtomic(t *testing.T) {
+	t.Run("struct", func(t *testing.T) {
+		type Person struct {
+			Name string
+			Age  int
+		}
+		p := Person{Name: "Alice", Age: 30}
+		a := NewAtomic(p)
+		if a.Get() != p {
+			t.Errorf("expected %+v, got %+v", p, a.Get())
+		}
+	})
+
+	t.Run("atomic-get", func(t *testing.T) {
+		a := NewAtomic(42)
+		const numGoroutines = 100
+		const numIterations = 1000
+
+		var wg sync.WaitGroup
+		wg.Add(numGoroutines)
+
+		for range numGoroutines {
+			go func() {
+				defer wg.Done()
+				for range numIterations {
+					val := a.Get()
+					if val != 42 {
+						t.Errorf("expected 42, got %d", val)
+					}
+				}
+			}()
+		}
+
+		wg.Wait()
+	})
+
+	t.Run("atomic-get-and-set", func(t *testing.T) {
+		a := NewAtomic(0)
+		const numSetters = 50
+		const numGetters = 50
+		const numIterations = 1000
+
+		var wg sync.WaitGroup
+		wg.Add(numSetters + numGetters)
+
+		// Setters
+		for i := range numSetters {
+			go func(id int) {
+				defer wg.Done()
+				for j := range numIterations {
+					a.Set(id*numIterations + j)
+				}
+			}(i)
+		}
+
+		// Getters
+		for range numGetters {
+			go func() {
+				defer wg.Done()
+				for range numIterations {
+					_ = a.Get()
+				}
+			}()
+		}
+
+		wg.Wait()
+	})
+}
