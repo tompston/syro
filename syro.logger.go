@@ -51,7 +51,8 @@ const (
 	FATAL LogLevel = 6
 )
 
-var LogLevels = []LogLevel{TRACE, DEBUG, INFO, WARN, ERROR, FATAL}
+// Fixed set of log levels
+var LogLevels = [...]LogLevel{TRACE, DEBUG, INFO, WARN, ERROR, FATAL}
 
 // LoggerSettings struct for storing the settings for the logger which are
 // used when printing the log to the console.

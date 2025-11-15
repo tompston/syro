@@ -32,15 +32,16 @@ func (lb *LogBuffer) Logf(format string, args ...any) {
 	lb.mu.Unlock()
 }
 
+// Reset resets the [Builder] to be empty.
 func (lb *LogBuffer) Reset() {
 	lb.mu.Lock()
 	lb.sb.Reset()
 	lb.mu.Unlock()
 }
 
-// ToFile returns the accumulated log contents as []byte,
+// Flush returns the accumulated sb contents as []byte,
 // and clears the in-memory buffer (thread-safe).
-func (lb *LogBuffer) ToBytes() []byte {
+func (lb *LogBuffer) Flush() []byte {
 	lb.mu.Lock()
 	defer lb.mu.Unlock()
 
@@ -49,8 +50,9 @@ func (lb *LogBuffer) ToBytes() []byte {
 	return data
 }
 
-func (lb *LogBuffer) ToZip(filename string) ([]byte, error) {
-	fileBytes := lb.ToBytes()
+// FlushToZip empties the sb and converts it to a zip
+func (lb *LogBuffer) FlushToZip(filename string) ([]byte, error) {
+	fileBytes := lb.Flush()
 
 	var buf bytes.Buffer
 	zw := zip.NewWriter(&buf)

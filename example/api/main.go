@@ -60,7 +60,7 @@ func ExposeTestServer() {
 	startServer(logger)
 }
 
-func doRandomLogging(logger *syro.MongoLogger) {
+func doRandomLogging(logger syro.Logger) {
 
 	logFields := GenerateRandomLogFields(RandomInt(0, 8))
 
@@ -80,7 +80,7 @@ func startServer(logger *syro.MongoLogger) {
 		w.Header().Set("Content-Type", "application/json")
 
 		const maxLimit = 1000
-		data, err := syro.Query().Logs(logger, maxLimit, r.URL.String())
+		data, err := syro.NewQueryHandler().Logs(logger, maxLimit, r.URL.String())
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return

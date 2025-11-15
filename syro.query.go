@@ -8,16 +8,16 @@ import (
 	"time"
 )
 
-// Struct for grouping up / exposing query functions that use the interfaces
-type query struct {
+// QueryHandler groups / exposing query functions that use the interfaces
+type QueryHandler struct {
 	Logs           func(l Logger, maxLimit int64, urlPath string) ([]Log, error)
 	Crons          func(s CronStorage, maxLimit int64, urlPath string) ([]CronJob, error)
 	CronExecutions func(s CronStorage, maxLimit int64, urlPath string) ([]CronExecLog, error)
 }
 
 // Query returns the functions for querying the data, based on the defined interface methods
-func Query() query {
-	return query{
+func NewQueryHandler() QueryHandler {
+	return QueryHandler{
 		// Query logs
 		Logs: func(l Logger, maxLimit int64, urlPath string) ([]Log, error) {
 			if l == nil {

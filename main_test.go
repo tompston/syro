@@ -1,6 +1,7 @@
 package syro
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -794,4 +795,109 @@ func BenchmarkLogString(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_ = log.String(logger)
 	}
+}
+
+func TestHttpbinReq(t *testing.T) {
+	res, err := NewRequest("GET", "https://httpbin.org/get").Do()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fmt.Printf("%v\n", res.Inspect())
+}
+
+func TestLogBuffer(t *testing.T) {
+
+	t.Run("logf-works", func(t *testing.T) {
+		lb := NewLogBuffer()
+
+		lb.Logf("Hello %s", "world")
+		lb.Logf("Count: %d", 42)
+
+		data := lb.Flush()
+		got := string(data)
+		want := "Hello world\nCount: 42\n"
+
+		if got != want {
+			t.Errorf("got %q, want %q", got, want)
+		}
+	})
+
+	t.Run("concurrent", func(t *testing.T) {
+		lb := NewLogBuffer()
+		var wg sync.WaitGroup
+
+		// Write from multiple goroutines
+		for i := 0; i < 100; i++ {
+			wg.Add(1)
+			go func(n int) {
+				defer wg.Done()
+				lb.Logf("log %d", n)
+			}(i)
+		}
+
+		wg.Wait()
+
+		data := lb.Flush()
+		lines := strings.Split(string(data), "\n")
+
+		// Should have 100 log lines + 1 empty string from final newline
+		if len(lines) != 101 {
+			t.Errorf("expected 101 lines (100 logs + empty), got %d", len(lines))
+		}
+	})
+
+	t.Run("flush-to-zip", func(t *testing.T) {
+		lb := NewLogBuffer()
+		lb.Logf("line 1")
+		lb.Logf("line 2")
+		lb.Logf("line 3")
+
+		zipBytes, err := lb.FlushToZip("test.log")
+		if err != nil {
+			t.Fatalf("FlushToZip failed: %v", err)
+		}
+
+		if len(zipBytes) == 0 {
+			t.Fatal("FlushToZip returned empty zip")
+		}
+
+		// Verify buffer is cleared
+		remaining := lb.Flush()
+		if len(remaining) != 0 {
+			t.Errorf("buffer not cleared after FlushToZip, got %d bytes", len(remaining))
+		}
+
+		// Read the zip and verify contents
+		zr, err := zip.NewReader(bytes.NewReader(zipBytes), int64(len(zipBytes)))
+		if err != nil {
+			t.Fatalf("failed to read zip: %v", err)
+		}
+
+		if len(zr.File) != 1 {
+			t.Fatalf("expected 1 file in zip, got %d", len(zr.File))
+		}
+
+		f := zr.File[0]
+		if f.Name != "test.log" {
+			t.Errorf("expected filename 'test.log', got %q", f.Name)
+		}
+
+		rc, err := f.Open()
+		if err != nil {
+			t.Fatalf("failed to open zip entry: %v", err)
+		}
+		defer rc.Close()
+
+		content, err := io.ReadAll(rc)
+		if err != nil {
+			t.Fatalf("failed to read zip entry: %v", err)
+		}
+
+		want := "line 1\nline 2\nline 3\n"
+		got := string(content)
+		if got != want {
+			t.Errorf("zip content mismatch\ngot:  %q\nwant: %q", got, want)
+		}
+	})
 }
