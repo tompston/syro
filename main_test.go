@@ -680,7 +680,6 @@ func TestRequestsWithMockServer(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		// fmt.Printf("res.Body: %v\n", string(res.Body))
 
 		fmt.Printf("%v\n", res.Inspect())
 	})
@@ -795,15 +794,6 @@ func BenchmarkLogString(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_ = log.String(logger)
 	}
-}
-
-func TestHttpbinReq(t *testing.T) {
-	res, err := NewRequest("GET", "https://httpbin.org/get").Do()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	fmt.Printf("%v\n", res.Inspect())
 }
 
 func TestLogBuffer(t *testing.T) {
