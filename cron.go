@@ -18,18 +18,6 @@ type CronScheduler struct {
 	storage CronStorage // storage is an optional storage interface for the CronScheduler (unexported, so that can be accesed with a safe method)
 }
 
-func (c *CronScheduler) Storage() (CronStorage, error) {
-	if c == nil {
-		return nil, fmt.Errorf("CronScheduler is nil")
-	}
-
-	if c.storage == nil {
-		return nil, fmt.Errorf("storage is nil")
-	}
-
-	return c.storage, nil
-}
-
 type CronStorage interface {
 	// FindCronJobs returns a list of all registered jobs
 	FindCronJobs() ([]CronJob, error)
@@ -44,13 +32,29 @@ type CronStorage interface {
 }
 
 func NewCronScheduler(cron *cron.Cron, source string) *CronScheduler {
-	return &CronScheduler{cron: cron, Source: source}
+	return &CronScheduler{
+		cron:   cron,
+		Source: source,
+		Jobs:   []*Job{},
+	}
 }
 
 // WithStorage sets the storage for the CronScheduler.
 func (s *CronScheduler) WithStorage(storage CronStorage) *CronScheduler {
 	s.storage = storage
 	return s
+}
+
+func (c *CronScheduler) Storage() (CronStorage, error) {
+	if c == nil {
+		return nil, fmt.Errorf("CronScheduler is nil")
+	}
+
+	if c.storage == nil {
+		return nil, fmt.Errorf("storage is nil")
+	}
+
+	return c.storage, nil
 }
 
 // Register adds a new job to the cron CronScheduler and wraps the job function with a
@@ -117,7 +121,7 @@ func (s *CronScheduler) Register(j *Job) error {
 		// Accumulate errors in the c.AddJob function, because the cron.Job param does not return anything
 
 		if storageSpecified {
-			if err := s.storage.RegisterJob(s.Source, name, schedule, descr, JobStatusRunning, nil); err != nil {
+			if err := s.storage.RegisterJob(source, name, schedule, descr, JobStatusRunning, nil); err != nil {
 				if loggerSpecified {
 					j.Logger.Error("failed to set job to running", LogFields{
 						"source": source,
@@ -150,7 +154,7 @@ func (s *CronScheduler) Register(j *Job) error {
 				}
 			}
 
-			if err := s.storage.RegisterJob(s.Source, name, schedule, descr, JobStatusDone, jobErr); err != nil {
+			if err := s.storage.RegisterJob(source, name, schedule, descr, JobStatusDone, jobErr); err != nil {
 				if loggerSpecified {
 					j.Logger.Error("failed to set job to done", LogFields{
 						"source": source,
