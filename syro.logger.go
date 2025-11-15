@@ -2,6 +2,7 @@ package syro
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -128,6 +129,7 @@ func (log Log) String(logger Logger) string {
 	}
 
 	var b strings.Builder
+	b.Grow(256) // Pre-allocate reasonable capacity
 
 	timeformat := settings.TimeFormat
 	if timeformat == "" {
@@ -143,15 +145,39 @@ func (log Log) String(logger Logger) string {
 	b.WriteString("  ")
 	b.WriteString(log.Message)
 
-	if log.Fields != nil {
+	// if log.Fields != nil {
+	// 	b.WriteString("  ")
+	// 	for k, v := range log.Fields {
+	// 		b.WriteString(" ")
+	// 		b.WriteString(k)
+	// 		b.WriteString("=")
+	// 		b.WriteString(fmt.Sprintf("%v", v))
+	// 	}
+	// }
 
+	// Faster than the upper no-reflection logic
+	if len(log.Fields) > 0 {
 		b.WriteString("  ")
 
 		for k, v := range log.Fields {
-			b.WriteString(" ")
+			b.WriteByte(' ')
 			b.WriteString(k)
-			b.WriteString("=")
-			b.WriteString(fmt.Sprintf("%v", v))
+			b.WriteByte('=')
+
+			switch val := v.(type) {
+			case string:
+				b.WriteString(val)
+			case int:
+				b.WriteString(strconv.Itoa(val))
+			case int64:
+				b.WriteString(strconv.FormatInt(val, 10))
+			case float64:
+				b.WriteString(strconv.FormatFloat(val, 'f', -1, 64))
+			case bool:
+				b.WriteString(strconv.FormatBool(val))
+			default:
+				b.WriteString(fmt.Sprintf("%v", v))
+			}
 		}
 	}
 

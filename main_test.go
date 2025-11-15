@@ -772,3 +772,26 @@ func TestExecFuncs(t *testing.T) {
 		})
 	}
 }
+
+func BenchmarkLogString(b *testing.B) {
+	log := Log{
+		Timestamp: time.Now().UTC(),
+		Level:     INFO,
+		Message:   "Test message for benchmarking",
+		Source:    "api",
+		Event:     "request",
+		EventID:   "evt_123456",
+		Fields: LogFields{
+			"user_id": "12345",
+			"action":  "login",
+			"ip":      "192.168.1.1",
+		},
+	}
+
+	logger := NewConsoleLogger(LoggerSettingsDefault)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = log.String(logger)
+	}
+}
