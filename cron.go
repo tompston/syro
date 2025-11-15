@@ -12,10 +12,11 @@ import (
 // registration of jobs and the optional storage of job status and
 // execution logs using the CronStorage interface.
 type CronScheduler struct {
-	cron    *cron.Cron  // cron is the cron CronScheduler which will run the jobs
-	Source  string      // Source is used to identify the source of the job
-	Jobs    []*Job      // Jobs is a list of all registered jobs
-	storage CronStorage // storage is an optional storage interface for the CronScheduler (unexported, so that can be accesed with a safe method)
+	cron    *cron.Cron          // cron is the cron CronScheduler which will run the jobs
+	Source  string              // Source is used to identify the source of the job
+	Jobs    []*Job              // Jobs is a list of all registered jobs
+	storage CronStorage         // storage is an optional storage interface for the CronScheduler (unexported, so that can be accesed with a safe method)
+	m       map[string]struct{} // store the name of the registered jobs in the map to check if the job with the same name has been registered
 }
 
 type CronStorage interface {
@@ -28,6 +29,7 @@ type CronStorage interface {
 	// FindExecutions returns a list of job executions that match the filter
 	FindExecutions(filter CronExecFilter, maxLimit int64) ([]CronExecLog, error)
 	// SetJobsToInactive updates the status of the jobs for the given source. Useful when the app exits.
+	// TODO: refactor to pass in the job status type, so that on startup a batch update can be done.
 	SetJobsToInactive(source string) error
 }
 
@@ -36,6 +38,7 @@ func NewCronScheduler(cron *cron.Cron, source string) *CronScheduler {
 		cron:   cron,
 		Source: source,
 		Jobs:   []*Job{},
+		m:      make(map[string]struct{}),
 	}
 }
 
@@ -45,11 +48,17 @@ func (s *CronScheduler) WithStorage(storage CronStorage) *CronScheduler {
 	return s
 }
 
-func (c *CronScheduler) Storage() (CronStorage, error) {
-	if c == nil {
-		return nil, fmt.Errorf("CronScheduler is nil")
+// NOTE: there is a slight inefficiency in the data that is written by
+// the query because the (source, name, schedule, descr) params are
+// written each time in order to update the status.
+func (c *CronScheduler) updateJobStatus(j *Job, status JobStatus, err error) error {
+	if c.storage != nil {
+		return c.storage.RegisterJob(c.Source, j.Name, j.Schedule, j.Description, status, err)
 	}
+	return nil
+}
 
+func (c *CronScheduler) Storage() (CronStorage, error) {
 	if c.storage == nil {
 		return nil, fmt.Errorf("storage is nil")
 	}
@@ -61,23 +70,18 @@ func (c *CronScheduler) Storage() (CronStorage, error) {
 // mutex lock to prevent the execution of the job if it is already running.
 // If a storage interface is provided, the job and job execution logs
 // will be stored using it
-func (s *CronScheduler) Register(j *Job) error {
+func (c *CronScheduler) Register(j *Job) error {
 	if j == nil {
 		return fmt.Errorf("job cannot be nil")
 	}
 
-	if s == nil {
-		return fmt.Errorf("cron scheduler cannot be nil")
-	}
-
-	if s.cron == nil {
+	if c.cron == nil {
 		return fmt.Errorf("cron cannot be nil")
 	}
 
 	name := j.Name
 	schedule := j.Schedule
-	source := s.Source
-	descr := j.Description
+	source := c.Source
 
 	if schedule == "" {
 		return fmt.Errorf("schedule has to be specified")
@@ -92,99 +96,48 @@ func (s *CronScheduler) Register(j *Job) error {
 	}
 
 	// if the name of the job is already taken, return an error
-	for _, job := range s.Jobs {
-		if job == nil {
-			return fmt.Errorf("one of the previously registered jobs is nil")
-		}
-
-		if job.Name == j.Name {
-			return fmt.Errorf("job with name %v already exists", j.Name)
-		}
+	if _, exists := c.m[name]; !exists {
+		c.m[name] = struct{}{}
+	} else {
+		return fmt.Errorf("job with the name of %v already is registered", name)
 	}
 
-	storageSpecified := s.storage != nil
-	loggerSpecified := j.Logger != nil
-
-	// NOTE: there is a slight inefficiency in the data that is written by
-	// the query because the (source, name, schedule, descr) params are
-	// written each time in order to update the status.
-
-	if storageSpecified {
-		if err := s.storage.RegisterJob(source, name, schedule, descr, JobStatusInitialized, nil); err != nil {
-			return err
-		}
-	}
+	c.updateJobStatus(j, JobStatusInitialized, nil)
 
 	joblock := newJobLock(func() {
 
-		jobStart := time.Now()
-		// Accumulate errors in the c.AddJob function, because the cron.Job param does not return anything
-
-		if storageSpecified {
-			if err := s.storage.RegisterJob(source, name, schedule, descr, JobStatusRunning, nil); err != nil {
-				if loggerSpecified {
-					j.Logger.Error("failed to set job to running", LogFields{
-						"source": source,
-						"name":   name,
-						"error":  err.Error(),
-					})
-				}
-			}
-		}
-
-		// Passed in job function which should be executed by the cron job
-		jobErr := j.Func()
+		c.updateJobStatus(j, JobStatusRunning, nil) // TODO: what should be done with error?
+		jobStartTime := time.Now()
+		jobErr := j.Func()                          // Passed in job function which should be executed by the cron job
+		c.updateJobStatus(j, JobStatusDone, jobErr) // TODO: what should be done with error?
 
 		if j.OnComplete != nil {
 			j.OnComplete(jobErr)
 		}
 
-		if jobErr != nil && j.OnError != nil {
-			j.OnError(jobErr)
-		}
-
-		if storageSpecified {
-			if err := s.storage.RegisterExecution(newCronExecutionLog(source, name, jobStart, jobErr)); err != nil {
-				if loggerSpecified {
-					j.Logger.Error("failed to register execution", LogFields{
-						"source": source,
-						"name":   name,
-						"error":  err.Error(),
-					})
-				}
-			}
-
-			if err := s.storage.RegisterJob(source, name, schedule, descr, JobStatusDone, jobErr); err != nil {
-				if loggerSpecified {
-					j.Logger.Error("failed to set job to done", LogFields{
-						"source": source,
-						"name":   name,
-						"error":  err.Error(),
-					})
-				}
-			}
+		if c.storage != nil {
+			c.storage.RegisterExecution(newCronExecutionLog(source, name, jobStartTime, jobErr))
 		}
 
 	}, name)
 
-	if _, err := s.cron.AddJob(schedule, joblock); err != nil {
+	if _, err := c.cron.AddJob(schedule, joblock); err != nil {
 		return err
 	}
 
 	// Add the job to the list of registered jobs
-	s.Jobs = append(s.Jobs, j)
+	c.Jobs = append(c.Jobs, j)
 
 	return nil
 }
 
-// Start the cron CronScheduler.
-//
-// NOTE: Need to specify for how long the CronScheduler should run after
-// calling this function (e.g. time.Sleep(1 * time.Hour) or forever)
+// Start the cron CronScheduler. Need to specify for how long
+// the CronScheduler should run after calling this function
+// (e.g. time.Sleep(1 * time.Hour) or forever)
 //
 // TODO: based on the source, the cron jobs which are not in the current list should be set to disbaled.
-func (s *CronScheduler) Start() {
-	s.cron.Start()
+func (c *CronScheduler) Start() {
+	c.cron.Start()
 }
 
 // Job represents a cron job that can be registered with the CronScheduler.
@@ -197,9 +150,7 @@ type Job struct {
 	Name        string       // Name of the job
 	Func        func() error // Function to be executed by the job
 	Description string       // Optional. Description of the job
-	OnError     func(error)  // Optional. Function to be executed if the job returns an error
 	OnComplete  func(error)  // Optional. Function to be executed when the job is completed.
-	Logger      Logger       // Optional. Used to log the errors for the cron registration
 }
 
 // CronJob stores information about the registered job
@@ -218,7 +169,7 @@ type CronJob struct {
 }
 
 // CronExecLog stores information about the job execution
-// TODO: should this just be a syro.Log?
+// TODO: should this just be a syro.Log? source -> source, name -> event id, all other fields are field
 type CronExecLog struct {
 	Source        string        `json:"source" bson:"source"`
 	Name          string        `json:"name" bson:"name"`
