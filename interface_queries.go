@@ -102,7 +102,6 @@ type TimeseriesFilter struct {
 func parseUrlToTimeseriesParams(vals url.Values) (*TimeseriesFilter, error) {
 	filter := TimeseriesFilter{}
 
-	// Parse "from" time
 	if from := vals.Get("from"); from != "" {
 		_time, err := time.Parse(time.RFC3339, from)
 		if err != nil {
@@ -112,7 +111,6 @@ func parseUrlToTimeseriesParams(vals url.Values) (*TimeseriesFilter, error) {
 		filter.From = _time
 	}
 
-	// Parse "to" time
 	if to := vals.Get("to"); to != "" {
 		_time, err := time.Parse(time.RFC3339, to)
 		if err != nil {
@@ -122,7 +120,6 @@ func parseUrlToTimeseriesParams(vals url.Values) (*TimeseriesFilter, error) {
 		filter.To = _time
 	}
 
-	// Parse "limit"
 	if limit := vals.Get("limit"); limit != "" {
 		parsedLimit, err := strconv.ParseInt(limit, 10, 64)
 		if err != nil || parsedLimit < 0 {
@@ -132,7 +129,6 @@ func parseUrlToTimeseriesParams(vals url.Values) (*TimeseriesFilter, error) {
 		filter.Limit = parsedLimit
 	}
 
-	// Parse "skip"
 	if skip := vals.Get("skip"); skip != "" {
 		parsedSkip, err := strconv.ParseInt(skip, 10, 64)
 		if err != nil || parsedSkip < 0 {

@@ -52,7 +52,6 @@ func addCrons(sched *syro.CronScheduler) error {
 			Schedule: "@every 1h",
 			Func: func() error {
 				fmt.Printf("%v this is my hourly cron\n", time.Now().Unix())
-				time.Sleep(time.Second * 3) // sleep for 3 sec in a 1s cron to show the lock
 				return nil
 			},
 		},

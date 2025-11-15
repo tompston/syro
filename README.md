@@ -1,6 +1,6 @@
 # syro
 
-Aka a bunch or util things that can be used between projects
+Aka a bunch or util things that can be used between projects. Can be seen as an opinionated extension of 
 
 > NOTE: there is 0 obligation from my side that the exposed api will not change in the future. At least not ini the beginging
 
