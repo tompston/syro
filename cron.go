@@ -166,7 +166,7 @@ func (c *CronScheduler) Start() {
 
 // Job represents a cron job that can be registered with the CronScheduler.
 // TODO: add a context input for callbacks? so that it would be possible to optionally cancel the job if it takes longer than x to run
-// TODO: add retrys logic? + additional pause between them?
+// TODO: add retry logic? + additional pause between them?
 type Job struct {
 	Schedule    string       // Schedule of the job (e.g. "0 0 * * *" or "@every 1h")
 	Name        string       // Name of the job

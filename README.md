@@ -114,6 +114,8 @@ job print-cron-job already running. Skipping...
 
 ```
 
+The CronScheduler has a method called `WithExecLogger` that can be optionally used to set a logger for the cron job executions.
+
 ### Http Requests
 
 You can build requests with the `syro.NewRequest()` function. It has multiple methods that can be used to further extend the request data.
