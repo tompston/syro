@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/robfig/cron/v3"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -212,22 +214,114 @@ func TestMongoImpl(t *testing.T) {
 	}
 	defer conn.Disconnect(ctx)
 
-	t.Run("cron-interface", func(t *testing.T) {
-		listColl := conn.Database(dbName).Collection("test_syro_cron")
-		if err := listColl.Drop(ctx); err != nil {
-			t.Fatal(err)
-		}
+	cron := cron.New()
 
-		cron := cron.New()
+	jobLogsColl := conn.Database(dbName).Collection("test_syro_cron_exec_logs")
+	if err := jobLogsColl.Drop(ctx); err != nil {
+		t.Fatal(err)
+	}
+	logger := NewMongoLogger(jobLogsColl, nil)
 
-		store, err := NewMongoCronStorage(listColl)
-		if err != nil {
-			t.Fatal(err)
-		}
+	jobListColl := conn.Database(dbName).Collection("test_syro_cron")
+	if err := jobListColl.Drop(ctx); err != nil {
+		t.Fatal(err)
+	}
 
-		// check if the store implements the CronStorage interface
-		sched := NewCronScheduler(cron, "qweqw").WithStorage(store)
-		_ = sched
+	store, err := NewMongoCronStorage(jobListColl)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var stringChangedOnErrorOfCronCallback = ""
+	const STRING_POST_CRON_EXEC = "hello there"
+
+	var myCustomErr = errors.New("always return an error")
+
+	job1 := &Job{
+		Schedule: "@every 1s",
+		Name:     "my-first-cron",
+		Func: func() error {
+			return fmt.Errorf("always return an error")
+		},
+		OnComplete: func(err error) {
+			if err != nil {
+				stringChangedOnErrorOfCronCallback = STRING_POST_CRON_EXEC
+			}
+		},
+	}
+
+	// check if the store implements the CronStorage interface
+	scheduler := NewCronScheduler(cron, "my-cron-app").WithStorage(store).WithExecLogger(logger)
+
+	t.Run("cronjob-tests", func(t *testing.T) {
+
+		t.Run("cronjob-callbacks-work", func(t *testing.T) {
+
+			if err := scheduler.Register(job1); err != nil {
+				t.Fatal(err)
+			}
+
+			scheduler.Start()
+			time.Sleep(time.Second * 3) // run for 3sec, so that the cron job executes
+			if stringChangedOnErrorOfCronCallback != STRING_POST_CRON_EXEC {
+				t.Fatalf("expected to have a mutation of string when the cron executes")
+			}
+
+			logs, err := logger.FindLogs(LogFilter{}, 100)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			if len(logs) == 0 {
+				t.Fatal("expected to find logs in the db after specifying the logger for the scheduler")
+			}
+
+			for _, l := range logs {
+				if l.Source != scheduler.Source {
+					t.Fatalf("expected the logs in the db to have the source of %v, got %v", scheduler.Source, l.Source)
+				}
+
+				if l.Event != job1.Name {
+					t.Fatalf("expected the logs in the db to have the event of %v, got %v", job1.Name, l.Event)
+				}
+
+				expectedKeysOfFields := []string{"time_init", "time_finish", "exec_dur"}
+
+				for _, expectedKey := range expectedKeysOfFields {
+					_, exists := l.Fields[expectedKey]
+					if !exists {
+						t.Fatalf("log fields did not have the expected value of %v", expectedKey)
+					}
+				}
+
+				if l.Message != myCustomErr.Error() {
+					t.Fatalf("expected the msg field to have the value of the error returned from the cron function (%v), found %v", myCustomErr, l.Message)
+				}
+
+				// get all crons
+				storage, err := scheduler.Storage()
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				crons, err := storage.FindCronJobs()
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				if len(crons) != 1 {
+					t.Fatalf("expected to find 1 cron in the collection, found %v", len(crons))
+				}
+
+				for _, c := range crons {
+					fmt.Printf("id: %v, source: %v, name: %v, sched: %v\n", c.ID, c.Source, c.Name, c.Schedule)
+
+					if _, err := primitive.ObjectIDFromHex(c.ID); err != nil {
+						t.Fatalf("unmarshalling the db cron entry id to an id got an err: %v", err)
+					}
+				}
+			}
+		})
 	})
 
 	t.Run("test-bson-unmarshalling", func(t *testing.T) {

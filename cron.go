@@ -25,8 +25,7 @@ type CronStorage interface {
 	FindCronJobs() ([]CronJob, error)
 	// RegisterJob registers the details of the selected job
 	RegisterJob(source, name, sched, descr string, status JobStatus, err error) error
-	// SetJobsToInactive updates the status of the jobs for the given source. Useful when the app exits.
-	// TODO: refactor to pass in the job status type, so that on startup a batch update can be done.
+	// SetStatusForJobs updates the status of the jobs for the given source
 	SetStatusForJobs(source string, status JobStatus) error
 }
 
@@ -164,11 +163,9 @@ func (c *CronScheduler) Start() {
 }
 
 // Job represents a cron job that can be registered with the CronScheduler.
-// TODO: test callbacks
 // TODO: add a context input for callbacks? so that it would be possible to optionally cancel the job if it takes longer than x to run
 // TODO: add retrys logic? + additional pause between them?
 type Job struct {
-	Source      string       // Source of the job (like the name of application which registered the job)
 	Schedule    string       // Schedule of the job (e.g. "0 0 * * *" or "@every 1h")
 	Name        string       // Name of the job
 	Func        func() error // Function to be executed by the job
@@ -178,7 +175,7 @@ type Job struct {
 
 // CronJob stores information about the registered job
 type CronJob struct {
-	// ID              string     `json:"_id" bson:"_id"`
+	ID          string     `json:"_id" bson:"_id"`
 	CreatedAt   time.Time  `json:"created_at" bson:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at" bson:"updated_at"`
 	FinishedAt  *time.Time `json:"finished_at" bson:"finished_at"`
@@ -194,11 +191,11 @@ type CronJob struct {
 type JobStatus string
 
 const (
-	JobStatusInitialized JobStatus = "initialized" // status set when the cron is added, but has not been run yet
-	JobStatusRunning     JobStatus = "running"     // crons which are currently running
-	JobStatusDone        JobStatus = "done"        // crons which are finished
-	JobStatusInactive    JobStatus = "inactive"    // crons which are not running
-	JobStatusRemoved     JobStatus = "removed"     // crons which are not present in the current list for the source
+	JobStatusInitialized JobStatus = "init"     // status set when the cron is added, but has not been run yet
+	JobStatusRunning     JobStatus = "running"  // crons which are currently running
+	JobStatusDone        JobStatus = "done"     // crons which are finished
+	JobStatusInactive    JobStatus = "inactive" // crons which are not running
+	JobStatusRemoved     JobStatus = "removed"  // crons which are not present in the current list for the source
 )
 
 // jobLock is a mutex lock that prevents the execution of a job if it is already running.
