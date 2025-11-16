@@ -112,7 +112,7 @@ func (c *CronScheduler) Register(j *Job) error {
 		return fmt.Errorf("job with the name of %v already is registered", name)
 	}
 
-	c.updateJobStatus(j, JobStatusInitialized, nil)
+	// c.updateJobStatus(j, JobStatusInitialized, nil) // done in the Start method, so that there is one batch update query
 
 	joblock := newJobLock(func() {
 
@@ -156,9 +156,11 @@ func (c *CronScheduler) Register(j *Job) error {
 // Start the cron CronScheduler. Need to specify for how long
 // the CronScheduler should run after calling this function
 // (e.g. time.Sleep(1 * time.Hour) or forever)
-//
-// TODO: based on the source, the cron jobs which are not in the current list should be set to disbaled.
 func (c *CronScheduler) Start() {
+	if c.storage != nil {
+		c.storage.SetStatusForJobs(c.Source, JobStatusInitialized)
+	}
+
 	c.cron.Start()
 }
 
