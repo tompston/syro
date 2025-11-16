@@ -1,11 +1,14 @@
 package syro
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
 )
+
+var ctx = context.Background()
 
 type Logger interface {
 	Log(level LogLevel, msg string, lf ...LogFields) error // Log method to log a message with a specific level and optional fields

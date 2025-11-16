@@ -1,7 +1,6 @@
 package syro
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -93,7 +92,7 @@ func (lg *MongoLogger) Log(level LogLevel, msg string, lf ...LogFields) error {
 		set["fields"] = log.Fields
 	}
 
-	_, err := lg.Coll.InsertOne(context.Background(), set)
+	_, err := lg.Coll.InsertOne(ctx, set)
 	fmt.Print(log.String(lg))
 	return err
 }
@@ -104,7 +103,7 @@ func (lg *MongoLogger) LogExists(filter any) (bool, error) {
 	}
 
 	var log Log
-	if err := lg.Coll.FindOne(context.Background(), filter).Decode(&log); err != nil {
+	if err := lg.Coll.FindOne(ctx, filter).Decode(&log); err != nil {
 		if err == mongo.ErrNoDocuments {
 			return false, nil
 		}
@@ -171,39 +170,21 @@ func (lg *MongoLogger) FindLogs(filter LogFilter, maxLimit int64) ([]Log, error)
 
 // MongoStorage implementation of the Storage interface
 type MongoCronStorage struct {
-	cronListColl    *mongo.Collection
-	cronHistoryColl *mongo.Collection
+	cronListColl *mongo.Collection
 }
 
-func NewMongoCronStorage(cronListColl, cronHistoryColl *mongo.Collection) (*MongoCronStorage, error) {
-	if cronListColl == nil || cronHistoryColl == nil {
-		return nil, fmt.Errorf("collections cannot be nil")
+func NewMongoCronStorage(cronListColl *mongo.Collection) (*MongoCronStorage, error) {
+	if cronListColl == nil {
+		return nil, fmt.Errorf("cron list collections cannot be nil")
 	}
 
 	return &MongoCronStorage{
-		cronListColl:    cronListColl,
-		cronHistoryColl: cronHistoryColl,
+		cronListColl: cronListColl,
 	}, nil
 }
 
 func (m *MongoCronStorage) CreateIndexes() error {
-	// Create indexes for the collections
-	if err := NewMongoIndexes().
-		Add("source", "name").
-		Add("status").
-		Create(m.cronListColl); err != nil {
-		return err
-	}
-
-	// Create indexes for the collections
-	if err := NewMongoIndexes().
-		Add("source", "name").
-		Add("initialized_at").
-		Create(m.cronHistoryColl); err != nil {
-		return err
-	}
-
-	return nil
+	return NewMongoIndexes().Add("source", "name").Add("status").Create(m.cronListColl)
 }
 
 // TODO: refactor so that filter is a variadic parameter
@@ -214,14 +195,14 @@ func (m *MongoCronStorage) FindCronJobs() ([]CronJob, error) {
 }
 
 // TODO: test this function + remember about the list of current jobs and the previous jobs which are not included in the list
-func (m *MongoCronStorage) SetJobsToInactive(source string) error {
+func (m *MongoCronStorage) SetStatusForJobs(source string, status JobStatus) error {
 	filter := bson.M{"source": source}
-	update := bson.M{"$set": bson.M{"status": JobStatusInactive}}
-	_, err := m.cronListColl.UpdateMany(context.Background(), filter, update)
+	update := bson.M{"$set": bson.M{"status": status}}
+	_, err := m.cronListColl.UpdateMany(ctx, filter, update)
 	return err
 }
 
-// RegisterJob upsert the job name in the database based on the source
+// RegisterJob upserts the job name in the database based on the source
 // and the job name. If the job does not exist, set the created_at
 // field to the current time. If the job already exists,
 // update the updated_at field to the current time.
@@ -250,7 +231,7 @@ func (m *MongoCronStorage) RegisterJob(source, name, sched, descr string, status
 		set["finished_at"] = time.Now().UTC()
 	}
 
-	_, err := m.cronListColl.UpdateOne(context.Background(), filter, bson.M{
+	_, err := m.cronListColl.UpdateOne(ctx, filter, bson.M{
 		"$set":         set,
 		"$setOnInsert": bson.M{"created_at": time.Now().UTC()},
 	}, mongoUpsertOpt)
@@ -258,61 +239,8 @@ func (m *MongoCronStorage) RegisterJob(source, name, sched, descr string, status
 	return err
 }
 
-// Register the execution of a job in the database
-func (m *MongoCronStorage) RegisterExecution(ex *CronExecLog) error {
-	if ex == nil {
-		return fmt.Errorf("job execution cannot be nil")
-	}
-
-	_, err := m.cronHistoryColl.InsertOne(context.Background(), ex)
-	return err
-}
-
-// FindExecutions returns a list of executions based on the filter
-func (m *MongoCronStorage) FindExecutions(filter CronExecFilter, maxLimit int64) ([]CronExecLog, error) {
-	queryFilter := bson.M{}
-
-	from, to := filter.From, filter.To
-
-	// if the from and to fields are not zero, add them to the query filter
-	if !from.IsZero() && !to.IsZero() {
-		if from.After(to) {
-			return nil, errors.New("from date cannot be after to date")
-		}
-
-		queryFilter["initialized_at"] = bson.M{"$gte": from, "$lte": to}
-	}
-
-	if filter.Source != "" {
-		queryFilter["source"] = filter.Source
-	}
-
-	if filter.Name != "" {
-		queryFilter["name"] = filter.Name
-	}
-
-	if filter.ExecutionTime > 0 {
-		queryFilter["execution_time"] = bson.M{"$gte": filter.ExecutionTime}
-	}
-
-	userLimit := filter.TimeseriesFilter.Limit
-	if userLimit > maxLimit {
-		userLimit = maxLimit
-	}
-
-	opts := options.Find().
-		SetSort(bson.D{{Key: "initialized_at", Value: -1}}).
-		SetLimit(int64(userLimit)).
-		SetSkip(filter.TimeseriesFilter.Skip)
-
-	var docs []CronExecLog
-	err := mongoGetDocuments(m.cronHistoryColl, queryFilter, opts, &docs)
-	return docs, err
-}
-
 // unexposed mongo specific utility function
 func mongoGetDocuments[T any](coll *mongo.Collection, filter primitive.M, options *options.FindOptions, results *[]T) error {
-	ctx := context.Background()
 	cur, err := coll.Find(ctx, filter, options)
 	if err != nil {
 		return err
@@ -358,7 +286,7 @@ func (ib *MongoIndexBuilder) Create(coll *mongo.Collection) error {
 		return fmt.Errorf("no indexes to create")
 	}
 
-	if _, err := coll.Indexes().CreateMany(context.Background(), ib.indexes); err != nil {
+	if _, err := coll.Indexes().CreateMany(ctx, ib.indexes); err != nil {
 		return fmt.Errorf("failed to create indexes for %v collection: %v", coll.Name(), err)
 	}
 

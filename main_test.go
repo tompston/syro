@@ -3,7 +3,6 @@ package syro
 import (
 	"archive/zip"
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -21,8 +20,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
-
-var ctx = context.Background()
 
 func TestLogger(t *testing.T) {
 	t.Run("test-log-creation", func(t *testing.T) {
@@ -221,14 +218,9 @@ func TestMongoImpl(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		historyColl := conn.Database(dbName).Collection("test_syro_cron_history")
-		if err := historyColl.Drop(ctx); err != nil {
-			t.Fatal(err)
-		}
-
 		cron := cron.New()
 
-		store, err := NewMongoCronStorage(listColl, historyColl)
+		store, err := NewMongoCronStorage(listColl)
 		if err != nil {
 			t.Fatal(err)
 		}

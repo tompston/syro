@@ -1,0 +1,134 @@
+// Register the execution of a job in the database
+func (m *MongoCronStorage) RegisterExecution(ex *CronExecLog) error {
+	if ex == nil {
+		return fmt.Errorf("job execution cannot be nil")
+	}
+
+	_, err := m.cronHistoryColl.InsertOne(context.Background(), ex)
+	return err
+}
+
+// FindExecutions returns a list of executions based on the filter
+func (m *MongoCronStorage) FindExecutions(filter CronExecFilter, maxLimit int64) ([]CronExecLog, error) {
+	queryFilter := bson.M{}
+
+	from, to := filter.From, filter.To
+
+	// if the from and to fields are not zero, add them to the query filter
+	if !from.IsZero() && !to.IsZero() {
+		if from.After(to) {
+			return nil, errors.New("from date cannot be after to date")
+		}
+
+		queryFilter["initialized_at"] = bson.M{"$gte": from, "$lte": to}
+	}
+
+	if filter.Source != "" {
+		queryFilter["source"] = filter.Source
+	}
+
+	if filter.Name != "" {
+		queryFilter["name"] = filter.Name
+	}
+
+	if filter.ExecutionTime > 0 {
+		queryFilter["execution_time"] = bson.M{"$gte": filter.ExecutionTime}
+	}
+
+	userLimit := filter.TimeseriesFilter.Limit
+	if userLimit > maxLimit {
+		userLimit = maxLimit
+	}
+
+	opts := options.Find().
+		SetSort(bson.D{{Key: "initialized_at", Value: -1}}).
+		SetLimit(int64(userLimit)).
+		SetSkip(filter.TimeseriesFilter.Skip)
+
+	var docs []CronExecLog
+	err := mongoGetDocuments(m.cronHistoryColl, queryFilter, opts, &docs)
+	return docs, err
+}
+
+
+		// Query the cron job executions
+		CronExecutions: func(s CronStorage, maxLimit int64, urlPath string) ([]CronExecLog, error) {
+			if s == nil {
+				return nil, errors.New("storage is nil")
+			}
+
+			parsedURL, err := url.Parse(urlPath)
+			if err != nil {
+				return nil, errors.New("failed to parse URL")
+			}
+
+			// Extract query parameters
+			params := parsedURL.Query()
+
+			ts, err := parseUrlToTimeseriesParams(params)
+			if err != nil {
+				return nil, err
+			}
+
+			filter := CronExecFilter{
+				TimeseriesFilter: *ts,
+				Source:           params.Get("source"),
+				Name:             params.Get("name"),
+			}
+
+			return s.FindExecutions(filter, maxLimit)
+		},
+
+
+
+// // CronExecLog stores information about the job execution
+// // TODO: should this just be a syro.Log? source -> source, name -> event id, all other fields are field
+// type CronExecLog struct {
+// 	Source        string        `json:"source" bson:"source"`
+// 	Name          string        `json:"name" bson:"name"`
+// 	InitializedAt time.Time     `json:"initialized_at" bson:"initialized_at"`
+// 	FinishedAt    time.Time     `json:"finished_at" bson:"finished_at"`
+// 	ExecutionTime time.Duration `json:"execution_time" bson:"execution_time"`
+// 	Error         string        `json:"error" bson:"error"`
+// }
+
+// type CronExecFilter struct {
+// 	TimeseriesFilter `json:"timeseries_filter" bson:"timeseries_filter"`
+// 	Source           string        `json:"source" bson:"source"`
+// 	Name             string        `json:"name" bson:"name"`
+// 	ExecutionTime    time.Duration `json:"execution_time" bson:"execution_time"`
+// }
+
+// func newCronExecutionLog(source, name string, initializedAt time.Time, err error) *CronExecLog {
+// 	log := &CronExecLog{
+// 		Source:        source,
+// 		Name:          name,
+// 		InitializedAt: initializedAt,
+// 		FinishedAt:    time.Now().UTC(),
+// 		ExecutionTime: time.Since(initializedAt),
+// 	}
+
+// 	// Avoid panics if the error is nil
+// 	if err != nil {
+// 		log.Error = err.Error()
+// 	}
+
+// 	return log
+// }
+
+
+type CronStorage interface {
+	// FindCronJobs returns a list of all registered jobs
+	FindCronJobs() ([]CronJob, error)
+	// RegisterJob registers the details of the selected job
+	RegisterJob(source, name, sched, descr string, status JobStatus, err error) error
+	// SetJobsToInactive updates the status of the jobs for the given source. Useful when the app exits.
+	// TODO: refactor to pass in the job status type, so that on startup a batch update can be done.
+	SetJobsToInactive(source string) error
+	// // RegisterExecution registers the execution of a job if the storage is specified
+	// RegisterExecution(*CronExecLog) error
+	// // FindExecutions returns a list of job executions that match the filter
+	// FindExecutions(filter CronExecFilter, maxLimit int64) ([]CronExecLog, error)
+
+	CronExecLogger() Logger
+}

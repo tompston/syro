@@ -10,9 +10,8 @@ import (
 
 // QueryHandler groups / exposing query functions that use the interfaces
 type QueryHandler struct {
-	Logs           func(l Logger, maxLimit int64, urlPath string) ([]Log, error)
-	Crons          func(s CronStorage, maxLimit int64, urlPath string) ([]CronJob, error)
-	CronExecutions func(s CronStorage, maxLimit int64, urlPath string) ([]CronExecLog, error)
+	Logs  func(l Logger, maxLimit int64, urlPath string) ([]Log, error)
+	Crons func(s CronStorage, maxLimit int64, urlPath string) ([]CronJob, error)
 }
 
 // Query returns the functions for querying the data, based on the defined interface methods
@@ -59,34 +58,6 @@ func NewQueryHandler() QueryHandler {
 			}
 
 			return s.FindCronJobs()
-		},
-
-		// Query the cron job executions
-		CronExecutions: func(s CronStorage, maxLimit int64, urlPath string) ([]CronExecLog, error) {
-			if s == nil {
-				return nil, errors.New("storage is nil")
-			}
-
-			parsedURL, err := url.Parse(urlPath)
-			if err != nil {
-				return nil, errors.New("failed to parse URL")
-			}
-
-			// Extract query parameters
-			params := parsedURL.Query()
-
-			ts, err := parseUrlToTimeseriesParams(params)
-			if err != nil {
-				return nil, err
-			}
-
-			filter := CronExecFilter{
-				TimeseriesFilter: *ts,
-				Source:           params.Get("source"),
-				Name:             params.Get("name"),
-			}
-
-			return s.FindExecutions(filter, maxLimit)
 		},
 	}
 }

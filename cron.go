@@ -12,11 +12,12 @@ import (
 // registration of jobs and the optional storage of job status and
 // execution logs using the CronStorage interface.
 type CronScheduler struct {
-	cron    *cron.Cron          // cron is the cron CronScheduler which will run the jobs
-	Source  string              // Source is used to identify the source of the job
-	Jobs    []*Job              // Jobs is a list of all registered jobs
-	storage CronStorage         // storage is an optional storage interface for the CronScheduler (unexported, so that can be accesed with a safe method)
-	m       map[string]struct{} // store the name of the registered jobs in the map to check if the job with the same name has been registered
+	cron       *cron.Cron          // cron is the cron CronScheduler which will run the jobs
+	Source     string              // Source is used to identify the source of the job
+	Jobs       []*Job              // Jobs is a list of all registered jobs
+	storage    CronStorage         // storage is an optional storage interface for the CronScheduler (unexported, so that can be accesed with a safe method)
+	m          map[string]struct{} // internal map of the registered job names to check if the job with the same name has been registered
+	execLogger Logger              // logger for the cron executions (time, duration, error)
 }
 
 type CronStorage interface {
@@ -24,13 +25,9 @@ type CronStorage interface {
 	FindCronJobs() ([]CronJob, error)
 	// RegisterJob registers the details of the selected job
 	RegisterJob(source, name, sched, descr string, status JobStatus, err error) error
-	// RegisterExecution registers the execution of a job if the storage is specified
-	RegisterExecution(*CronExecLog) error
-	// FindExecutions returns a list of job executions that match the filter
-	FindExecutions(filter CronExecFilter, maxLimit int64) ([]CronExecLog, error)
 	// SetJobsToInactive updates the status of the jobs for the given source. Useful when the app exits.
 	// TODO: refactor to pass in the job status type, so that on startup a batch update can be done.
-	SetJobsToInactive(source string) error
+	SetStatusForJobs(source string, status JobStatus) error
 }
 
 func NewCronScheduler(cron *cron.Cron, source string) *CronScheduler {
@@ -44,7 +41,23 @@ func NewCronScheduler(cron *cron.Cron, source string) *CronScheduler {
 
 // WithStorage sets the storage for the CronScheduler.
 func (s *CronScheduler) WithStorage(storage CronStorage) *CronScheduler {
-	s.storage = storage
+	if storage != nil {
+		s.storage = storage
+	}
+	return s
+}
+
+// WithExecLogger will use the passed in logger to log the executions of the cron job
+// as structured logs, setting the source of the log to source of the scheduler,
+// event as the name of the cron and populate the log fields with
+// `time_init`, `time_finish` and `exec_dur` for further info.
+// On successful execution, the log will have thestatus as
+// info. If the passed in function returns an error,
+// then it will be logged as an error log.
+func (s *CronScheduler) WithExecLogger(l Logger) *CronScheduler {
+	if l != nil {
+		s.execLogger = l
+	}
 	return s
 }
 
@@ -78,9 +91,8 @@ func (c *CronScheduler) Register(j *Job) error {
 		return fmt.Errorf("cron cannot be nil")
 	}
 
-	name := j.Name
 	schedule := j.Schedule
-	source := c.Source
+	name := j.Name
 
 	if schedule == "" {
 		return fmt.Errorf("schedule has to be specified")
@@ -114,8 +126,20 @@ func (c *CronScheduler) Register(j *Job) error {
 			j.OnComplete(jobErr)
 		}
 
-		if c.storage != nil {
-			c.storage.RegisterExecution(newCronExecutionLog(source, name, jobStartTime, jobErr))
+		if c.execLogger != nil {
+			lg := c.execLogger.WithSource(c.Source).WithEvent(j.Name)
+
+			fields := LogFields{
+				"time_init":   jobStartTime,
+				"time_finish": time.Now().UTC(),
+				"exec_dur":    time.Since(jobStartTime),
+			}
+
+			if jobErr != nil {
+				lg.Error(jobErr.Error(), fields)
+			} else {
+				lg.Info("done", fields)
+			}
 		}
 
 	}, name)
@@ -165,41 +189,6 @@ type CronJob struct {
 	Description string     `json:"descr" bson:"descr"`
 	Error       string     `json:"error" bson:"error"`
 	ExitWithErr bool       `json:"exit_with_err" bson:"exit_with_err"`
-}
-
-// CronExecLog stores information about the job execution
-// TODO: should this just be a syro.Log? source -> source, name -> event id, all other fields are field
-type CronExecLog struct {
-	Source        string        `json:"source" bson:"source"`
-	Name          string        `json:"name" bson:"name"`
-	InitializedAt time.Time     `json:"initialized_at" bson:"initialized_at"`
-	FinishedAt    time.Time     `json:"finished_at" bson:"finished_at"`
-	ExecutionTime time.Duration `json:"execution_time" bson:"execution_time"`
-	Error         string        `json:"error" bson:"error"`
-}
-
-type CronExecFilter struct {
-	TimeseriesFilter `json:"timeseries_filter" bson:"timeseries_filter"`
-	Source           string        `json:"source" bson:"source"`
-	Name             string        `json:"name" bson:"name"`
-	ExecutionTime    time.Duration `json:"execution_time" bson:"execution_time"`
-}
-
-func newCronExecutionLog(source, name string, initializedAt time.Time, err error) *CronExecLog {
-	log := &CronExecLog{
-		Source:        source,
-		Name:          name,
-		InitializedAt: initializedAt,
-		FinishedAt:    time.Now().UTC(),
-		ExecutionTime: time.Since(initializedAt),
-	}
-
-	// Avoid panics if the error is nil
-	if err != nil {
-		log.Error = err.Error()
-	}
-
-	return log
 }
 
 type JobStatus string
