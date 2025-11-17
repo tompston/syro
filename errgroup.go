@@ -7,6 +7,7 @@ import (
 // ErrGroup is a helper struct for cases when a single function
 // could have multiple errors which should be accumulated,
 // instead of returning the first one.
+// TODO: add safety for concurrency
 type ErrGroup struct {
 	errors      []error
 	ID          string

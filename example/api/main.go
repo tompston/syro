@@ -28,15 +28,9 @@ func setupConn() (*mongo.Client, error) {
 	url := "mongodb://localhost:27017"
 
 	opt := options.Client().
-		SetMaxPoolSize(20).                   // Set the maximum number of connections in the connection pool
-		SetMaxConnIdleTime(10 * time.Minute). // Close idle connections after the specified time
+		SetMaxConnIdleTime(10 * time.Minute).
+		SetMaxPoolSize(20).
 		ApplyURI(url)
-
-	// conn, err := mongo.Connect(ctx, opt)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// defer conn.Disconnect(ctx)
 
 	return mongo.Connect(ctx, opt)
 }
@@ -73,7 +67,7 @@ func RandomInt(min, max int) int {
 	return rand.Intn(max-min) + min
 }
 
-func startServer(logger *syro.MongoLogger) {
+func startServer(logger syro.Logger) {
 	http.HandleFunc("GET /logs", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Credentials", "false")

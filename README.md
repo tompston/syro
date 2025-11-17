@@ -168,3 +168,11 @@ Body:
 - the logger is based around interfaces that have GetX and FindX type of methods, which can be used to retrieve the logs from the database. Simple queries can be done in this way, but once you need complex queries for the logs, then the interface methods are not quite the best approach.
 - This package does come with a dependency for `go.mongodb.org/mongo-driver`, as there is an implementation for the logger and cron job storage interface with it. The correct way would be to split this into two seperate packages, but an overkill of complexity at the start.
 - yes, syro is a reference to the aphex twin album
+
+
+### TODO
+
+- [ ] frontend
+  - [ ] settings grid for api urls (logs, crons)
+    - [ ] store settings in localstorage
+  - [ ] hosting the static site as an embedded file
