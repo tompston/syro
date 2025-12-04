@@ -2,12 +2,14 @@ package syro
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"maps"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -20,6 +22,7 @@ type Request struct {
 	ignoreStatusCodes bool
 	client            *http.Client // Optional custom HTTP client. If nil, default client will be used
 	errBodyLimit      *int         // Optional limit for the returned body size on error. If nil, no limit
+	ctx               context.Context
 }
 
 type Response struct {
@@ -39,11 +42,34 @@ func NewRequest(method, url string) *Request {
 		Headers:      make(map[string]string),
 		client:       &http.Client{},
 		errBodyLimit: &defaultErrBodyLimit,
+		ctx:          context.Background(),
 	}
 }
 
 func (r *Request) WithHeaders(headers map[string]string) *Request {
 	maps.Copy(r.Headers, headers)
+	return r
+}
+
+func (r *Request) WithCtx(ctx context.Context) *Request {
+	if ctx != nil {
+		r.ctx = ctx
+	}
+	return r
+}
+
+func (r *Request) WithBearerToken(token string) *Request {
+	r.Headers["Authorization"] = "Bearer " + token
+	return r
+}
+
+func (r *Request) WithFormData(data map[string]string) *Request {
+	form := url.Values{}
+	for k, v := range data {
+		form.Add(k, v)
+	}
+	r.Body = []byte(form.Encode())
+	r.Headers["Content-Type"] = "application/x-www-form-urlencoded"
 	return r
 }
 
@@ -104,7 +130,7 @@ func (r *Request) Do() (*Response, error) {
 		reqBody = r.Body
 	}
 
-	req, err := http.NewRequest(r.Method, url, bytes.NewBuffer(reqBody))
+	req, err := http.NewRequestWithContext(r.ctx, r.Method, url, bytes.NewBuffer(reqBody))
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +143,7 @@ func (r *Request) Do() (*Response, error) {
 
 	res, err := r.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("error fetching %v : %v", r.URL, err)
+		return nil, fmt.Errorf("error fetching %v : %v", url, err)
 	}
 	defer res.Body.Close()
 
@@ -125,10 +151,10 @@ func (r *Request) Do() (*Response, error) {
 
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		return nil, fmt.Errorf("error reading response body when fetching %v, status %v: %v, error: ", url, res.Status, err)
+		return nil, fmt.Errorf("error reading response body when fetching %v, status %v: error: %v", url, res.Status, err)
 	}
 
-	responseData := &Response{
+	_response := &Response{
 		StatusCode: res.StatusCode,
 		Header:     res.Header,
 		Body:       body,
@@ -137,7 +163,7 @@ func (r *Request) Do() (*Response, error) {
 	}
 
 	if r.ignoreStatusCodes {
-		return responseData, nil
+		return _response, nil
 	}
 
 	if res.StatusCode != 200 && res.StatusCode != 201 && res.StatusCode != 202 {
@@ -147,14 +173,14 @@ func (r *Request) Do() (*Response, error) {
 			bodyStr = string(body[:bodyUpTo])
 		}
 
-		return responseData, fmt.Errorf("response did not return status in 200 group while requesting %v, status: %v, body: %v", url, res.Status, bodyStr)
+		return _response, fmt.Errorf("response did not return status in 200 group while requesting %v, status: %v, body: %v", url, res.Status, bodyStr)
 	}
 
 	if body == nil {
-		return responseData, fmt.Errorf("response returned empty body while requesting %v", url)
+		return _response, fmt.Errorf("response returned empty body while requesting %v", url)
 	}
 
-	return responseData, nil
+	return _response, nil
 }
 
 func (r *Request) AsCURL() string {
@@ -194,38 +220,19 @@ func (r *Request) AsCURL() string {
 	return buf.String()
 }
 
-func (r *Response) Prettified() string {
-	buf := bytes.Buffer{}
-
-	buf.WriteString(fmt.Sprintf("Status: %d\n", r.StatusCode))
-	buf.WriteString(fmt.Sprintf("Duration: %v\n", r.Duration))
-
-	buf.WriteString("Headers:\n")
-	for k, v := range r.Header {
-		buf.WriteString(fmt.Sprintf("  %s: %s\n", k, v))
-	}
-	buf.WriteString("\n")
-
-	if r.Body != nil {
-		buf.WriteString("Body:\n\n")
-		buf.Write(r.Body)
-		buf.WriteString("\n")
-	}
-
-	return buf.String()
-}
-
-func (r *Response) Inspect() string {
+func (r *Response) Summary() string {
 
 	formatBody := func(data []byte) string {
 		var obj any
 		if err := json.Unmarshal(data, &obj); err != nil {
 			return string(data)
 		}
+
 		pretty, err := json.MarshalIndent(obj, "", "  ")
 		if err != nil {
 			return string(data)
 		}
+
 		return string(pretty)
 	}
 
