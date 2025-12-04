@@ -1046,3 +1046,13 @@ func TestAtomic(t *testing.T) {
 		wg.Wait()
 	})
 }
+
+func TestXmlUnmarshal(t *testing.T) {
+	str := "<person><name>John</name><age>30</age></person>"
+	pretty, err := prettyPrintXML(str)
+	if err != nil {
+		t.Fatalf("failed to unmarshal xml: %v", err)
+	}
+
+	fmt.Printf("pretty: \n%v\n", pretty)
+}

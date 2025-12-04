@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"io"
 	"maps"
@@ -222,20 +223,6 @@ func (r *Request) AsCURL() string {
 
 func (r *Response) Summary() string {
 
-	formatBody := func(data []byte) string {
-		var obj any
-		if err := json.Unmarshal(data, &obj); err != nil {
-			return string(data)
-		}
-
-		pretty, err := json.MarshalIndent(obj, "", "  ")
-		if err != nil {
-			return string(data)
-		}
-
-		return string(pretty)
-	}
-
 	var sb strings.Builder
 
 	// Request section
@@ -258,7 +245,7 @@ func (r *Response) Summary() string {
 
 	// Body
 	sb.WriteString("\nBody:\n")
-	bodyStr := formatBody(r.Body)
+	bodyStr := r.formatBody()
 	for _, line := range strings.Split(bodyStr, "\n") {
 		if line != "" {
 			sb.WriteString("   " + line + "\n")
@@ -266,4 +253,90 @@ func (r *Response) Summary() string {
 	}
 
 	return sb.String()
+}
+
+func (r *Response) formatBody() string {
+	if r == nil {
+		return ""
+	}
+
+	data := r.Body
+
+	if len(data) == 0 {
+		return "(empty)"
+	}
+
+	// Trim whitespace to check actual content
+	trimmed := bytes.TrimSpace(data)
+	if len(trimmed) == 0 {
+		return "(empty)"
+	}
+
+	// Check Content-Type header first
+	contentType := r.Header.Get("Content-Type")
+
+	// Try JSON - check header or content structure
+	if strings.Contains(contentType, "application/json") ||
+		strings.Contains(contentType, "text/json") ||
+		bytes.HasPrefix(trimmed, []byte("{")) ||
+		bytes.HasPrefix(trimmed, []byte("[")) {
+		var obj any
+		if err := json.Unmarshal(trimmed, &obj); err == nil {
+			pretty, err := json.MarshalIndent(obj, "", "  ")
+			if err == nil {
+				return string(pretty)
+			}
+		}
+	}
+
+	// Try XML - check header or content structure
+	if strings.Contains(contentType, "application/xml") ||
+		strings.Contains(contentType, "text/xml") ||
+		(bytes.HasPrefix(trimmed, []byte("<")) && bytes.HasSuffix(trimmed, []byte(">"))) {
+
+		// Additional check: verify it's not HTML
+		lowerContent := strings.ToLower(string(trimmed[:min(len(trimmed), 200)]))
+		isHTML := strings.Contains(lowerContent, "<!doctype html") || strings.Contains(lowerContent, "<html")
+
+		if !isHTML {
+			content, err := prettyPrintXML(string(data))
+			if err == nil {
+				return content
+			}
+		}
+	}
+
+	// Fall back to plain string
+	return string(data)
+}
+
+func prettyPrintXML(xmlString string) (string, error) {
+	// Create a decoder
+	decoder := xml.NewDecoder(strings.NewReader(xmlString))
+
+	// Read tokens and rebuild
+	var buf bytes.Buffer
+	encoder := xml.NewEncoder(&buf)
+	encoder.Indent("", "  ")
+
+	for {
+		token, err := decoder.Token()
+		if err == io.EOF {
+			break
+		}
+
+		if err != nil {
+			return "", err
+		}
+
+		if err := encoder.EncodeToken(token); err != nil {
+			return "", err
+		}
+	}
+
+	if err := encoder.Flush(); err != nil {
+		return "", err
+	}
+
+	return xml.Header + buf.String(), nil
 }
