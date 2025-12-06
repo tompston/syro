@@ -1,0 +1,425 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>syro</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- <link rel="stylesheet" href="https://unpkg.com/98.css" /> -->
+
+    <script type="module">
+      import van from "https://cdn.jsdelivr.net/gh/vanjs-org/van/public/van-1.5.5.min.js";
+
+      const { div, form, input, select, option, button, style, span } =
+        van.tags;
+
+      function prettifyDate(v) {
+        try {
+          return new Date(v).toLocaleString(undefined, {
+            year: "numeric",
+            month: "short",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+          });
+        } catch (e) {
+          return "Invalid Date";
+        }
+      }
+
+      const LogsPage = (() => {
+        const logs = van.state([]);
+        const isLoading = van.state(true);
+        const error = van.state(null);
+        const isPaused = van.state(false);
+
+        const MAX_LOGS = 500;
+        const logMap = new Map();
+        let lastUrl = null;
+
+        let filters = {
+          from: van.state(""),
+          to: van.state(""),
+          level: van.state(""),
+          source: van.state(""),
+          event: van.state(""),
+        };
+
+        const searchText = van.state("");
+
+        const LEVEL_MAP = {
+          1: { label: "TRACE", class: "log-trace" },
+          2: { label: "DEBUG", class: "log-debug" },
+          3: { label: "INFO", class: "log-info" },
+          4: { label: "WARN", class: "log-warn" },
+          5: { label: "ERROR", class: "log-error" },
+          6: { label: "FATAL", class: "log-fatal" },
+        };
+
+        const baseUrl = "http://localhost:3094/logs";
+
+        function isDate(value) {
+          return !isNaN(Date.parse(value));
+        }
+
+        const constructApiUrl = () => {
+          const params = new URLSearchParams();
+          if (filters.from.val && isDate(filters.from.val)) {
+            params.append("from", filters.from.val + ":00Z");
+          }
+
+          if (filters.to.val && isDate(filters.to.val)) {
+            params.append("to", filters.to.val + ":00Z");
+          }
+
+          if (filters.level.val) params.append("level", filters.level.val);
+          if (filters.source.val) params.append("source", filters.source.val);
+          if (filters.event.val) params.append("event", filters.event.val);
+          return `${baseUrl}?limit=50&${params.toString()}`;
+        };
+
+        const fetchLogs = async () => {
+          try {
+            error.val = null;
+            isLoading.val = true;
+
+            const url = constructApiUrl();
+            const res = await fetch(url);
+            const data = await res.json();
+            if (!res.ok) {
+              throw new Error(
+                `${res.status}: ${res.statusText}, ${JSON.stringify(data) || "Unknown error"}`
+              );
+            }
+
+            if (!Array.isArray(data)) {
+              error.val = "No logs found";
+              return;
+            }
+
+            data.sort((a, b) => new Date(b.time) - new Date(a.time));
+
+            if (url === lastUrl) {
+              const newLogs = [];
+
+              for (const log of data) {
+                if (!logMap.has(log._id)) {
+                  logMap.set(log._id, log);
+                  newLogs.push(log);
+                }
+              }
+
+              if (newLogs.length > 0) {
+                const merged = [...newLogs, ...logs.val];
+
+                // Trim logs and logMap to max size
+                const trimmed = merged.slice(0, MAX_LOGS);
+                logs.val = trimmed;
+
+                // Keep logMap in sync
+                const newMap = new Map();
+                for (const log of trimmed) newMap.set(log._id, log);
+                logMap.clear();
+                for (const [k, v] of newMap) logMap.set(k, v);
+              }
+            } else {
+              logMap.clear();
+              for (const log of data.slice(0, MAX_LOGS)) {
+                logMap.set(log._id, log);
+              }
+              logs.val = data.slice(0, MAX_LOGS);
+              lastUrl = url;
+            }
+          } catch (e) {
+            error.val = e.message;
+          } finally {
+            isLoading.val = false;
+          }
+        };
+
+        const applyFilters = (e) => {
+          e.preventDefault();
+          console.log(filters);
+          fetchLogs();
+        };
+
+        const LogRow = (log) => {
+          const entry = LEVEL_MAP[log.level];
+          const label = entry?.label || log.level;
+          const className = entry?.class + " llb" || "";
+
+          const sep = "*";
+
+          let eventSource = `${log.source || sep}.${log.event || sep}.${log.event_id || sep}`;
+
+          // if the log.fiedls is an object, sort iit base on keys, for consistency
+          let fields = log.fields || {};
+          const sortedFields = Object.keys(fields)
+            .sort()
+            .reduce((acc, key) => {
+              acc[key] = fields[key];
+              return acc;
+            }, {});
+
+          return div(
+            {
+              class: "log-row log-grid",
+              style:
+                "font-size: 11px;font-family: Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
+            },
+            div({ class: "pl-2" }, div(prettifyDate(log.ts))),
+            div(div({ class: className }, label)),
+            div(eventSource),
+            div(
+              // { style: "display:flex;" },
+              div(log.msg || ""),
+              div(
+                { style: "display:flex; gap:3px; flex-wrap: wrap;" },
+                Object.entries(sortedFields).map(([key, value]) =>
+                  span(
+                    {
+                      key,
+                      class: "bg-stone-500/80",
+                      style:
+                        "border-radius:4px; font-size:10px; padding:3px 7px;",
+                    },
+                    `${key}:${value}`
+                  )
+                )
+              )
+            )
+          );
+        };
+
+        const LogTable = () =>
+          div(
+            van.derive(() =>
+              div(
+                // Table headers
+                // div(
+                //   { class: "log-grid" },
+                //   div("time"),
+                //   div("level"),
+                //   div("source"),
+                //   div("msg")
+                // ),
+                // Render error message if it exists
+                error.val &&
+                  div(
+                    {
+                      class: "m-3 text-red-400",
+                      style:
+                        "background-color: rgba(255, 0, 0, 0.1); padding: 10px; border-radius: 4px; margin-bottom: 10px; margin-top: 7px;",
+                    },
+                    `Error: ${error.val}`
+                  ),
+                // Table body
+                (() => {
+                  const search = searchText.val.toLowerCase();
+                  const filteredLogs = logs.val.filter((log) => {
+                    const logLevel =
+                      LEVEL_MAP[log.level]?.label.toLowerCase() || "unknown";
+                    return JSON.stringify({ ...log, levelLabel: logLevel })
+                      .toLowerCase()
+                      .includes(search);
+                  });
+                  return div(
+                    filteredLogs.map((log) =>
+                      div({ key: log._id }, LogRow(log))
+                    )
+                  );
+                })()
+              )
+            )
+          );
+
+        const FilterForm = () =>
+          form(
+            { onsubmit: applyFilters, class: "p-4 grid gap-2" },
+            div(
+              input({
+                class: "sidebar-input datetime-local-white-calendrar",
+                type: "datetime-local",
+                value: filters.from.val,
+                oninput: (e) => (filters.from.val = e.target.value),
+              })
+            ),
+            div(
+              input({
+                class: "sidebar-input datetime-local-white-calendrar",
+                type: "datetime-local",
+                value: filters.to.val,
+                oninput: (e) => (filters.to.val = e.target.value),
+              })
+            ),
+
+            div(
+              select(
+                {
+                  class: "sidebar-input",
+                  value: filters.level.val,
+                  onchange: (e) => (filters.level.val = e.target.value),
+                },
+                option({ value: "" }, "All Levels"),
+                ...Object.entries(LEVEL_MAP).map(([value, entry]) =>
+                  option({ value }, entry.label)
+                )
+              )
+            ),
+            div(
+              input({
+                class: "sidebar-input",
+                placeholder: "source",
+                value: filters.source.val,
+                oninput: (e) => (filters.source.val = e.target.value),
+              })
+            ),
+            div(
+              input({
+                class: "sidebar-input",
+                placeholder: "event",
+                value: filters.event.val,
+                oninput: (e) => (filters.event.val = e.target.value),
+              })
+            ),
+            div(
+              input({
+                class: "sidebar-input",
+                placeholder: "Search",
+                value: searchText.val,
+                oninput: (e) => (searchText.val = e.target.value),
+              })
+            ),
+            button(
+              { type: "submit", class: "uppercase text-[11px]" },
+              "Apply Filters"
+            ),
+            button(
+              {
+                class: "sidebar-input",
+                type: "button",
+                onclick: () => (isPaused.val = !isPaused.val),
+                style: "margin-top: 10px",
+              },
+              van.derive(() =>
+                isPaused.val ? "▶️ Resume Fetching" : "⏸️ Pause Fetching"
+              )
+            )
+          );
+
+        const View = () =>
+          div(
+            {
+              class:
+                "grid w-full grid-cols-[240px_1fr] text-white",
+            },
+            div(
+              {
+                id: "sidebar",
+                class: "w-full h-full border-r border-gray-400/40",
+              },
+              FilterForm()
+            ),
+            div({ id: "main", class: "" }, LogTable())
+          );
+
+        // Run once at mount
+        fetchLogs();
+
+        const interval = setInterval(() => {
+          if (!isPaused.val) fetchLogs();
+        }, 5000);
+
+        window.addEventListener("beforeunload", () => clearInterval(interval));
+
+        return { View };
+      })();
+
+      // Mount and refresh
+      van.add(document.body, LogsPage.View());
+    </script>
+    <style>
+
+
+      .log-grid {
+        display: grid;
+        grid-template-columns: 170px 70px 150px 1fr;
+        gap: 0.5em;
+      }
+
+      .log-row {
+        border-bottom: 1px dashed #818181;
+        padding: 0.5em 0;
+      }
+
+      /* log-level-base */
+      .llb {
+        display: inline-block;
+        padding: 2px 10px;
+        width: 60px;
+        text-align: center;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 500;
+        font-family:
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          Roboto,
+          Oxygen,
+          Ubuntu,
+          Cantarell,
+          "Open Sans",
+          "Helvetica Neue",
+          sans-serif;
+      }
+
+      .sidebar-input {
+        width: 100%;
+        /* padding: 0.5em; */
+        padding: 3px 10px;
+        border-radius: 4px;
+        border: 1px solid #cccccc71;
+        box-sizing: border-box;
+        font-size: 13px;
+      }
+
+      .log-trace {
+        color: rgb(250, 250, 250);
+        background: rgb(249, 176, 248);
+      }
+
+      .log-debug {
+        color: rgb(38, 206, 206);
+        background-color: rgba(0, 226, 226, 0.316);
+      }
+
+      .log-info {
+        color: green;
+        background: rgb(180, 215, 180);
+      }
+
+      .log-warn {
+        color: rgb(255, 220, 43);
+        background-color: rgb(212, 132, 34);
+      }
+
+      .log-error {
+        color: rgb(42, 39, 39);
+        background: rgb(251, 173, 173);
+      }
+
+      .log-fatal {
+        color: rgb(240, 141, 141);
+        background: rgb(144, 27, 27);
+      }
+
+      .datetime-local-white-calendrar::-webkit-calendar-picker-indicator {
+        cursor: pointer;
+        filter: invert(1) !important;
+      }
+    </style>
+  </head>
+  <body class="w-full h-full bg-stone-700 "></body>
+</html>
