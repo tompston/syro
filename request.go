@@ -15,6 +15,28 @@ import (
 	"time"
 )
 
+type HttpClient struct {
+	client *http.Client
+}
+
+// Make http requests with the client reused
+func NewHttpClient(c *http.Client) *HttpClient {
+	if c == nil {
+		c = http.DefaultClient
+	}
+	return &HttpClient{c}
+}
+
+func (c *HttpClient) Request(method, url string) *Request {
+	return &Request{
+		Method:  method,
+		URL:     url,
+		Headers: map[string]string{},
+		client:  c.client,
+		ctx:     ctx,
+	}
+}
+
 type Request struct {
 	ctx               context.Context
 	Headers           map[string]string
@@ -43,7 +65,7 @@ func NewRequest(method, url string) *Request {
 		Headers:      make(map[string]string),
 		client:       &http.Client{},
 		errBodyLimit: &defaultErrBodyLimit,
-		ctx:          context.Background(),
+		ctx:          ctx,
 	}
 }
 
@@ -108,9 +130,7 @@ func (r *Request) WithIgnoreStatusCodes(ignore bool) *Request {
 }
 
 func (r *Request) WithClient(c *http.Client) *Request {
-	if c != nil {
-		r.client = c
-	}
+	r.client = c
 	return r
 }
 
