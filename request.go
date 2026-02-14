@@ -27,6 +27,17 @@ func NewHttpClient(c *http.Client) *HttpClient {
 	return &HttpClient{c}
 }
 
+func (c *HttpClient) Client() *http.Client {
+	return c.client
+}
+
+func (c *HttpClient) Transport() *http.Transport {
+	if tr, ok := c.client.Transport.(*http.Transport); ok {
+		return tr
+	}
+	return http.DefaultTransport.(*http.Transport)
+}
+
 func (c *HttpClient) Request(method, url string) *Request {
 	return &Request{
 		Method:  method,
