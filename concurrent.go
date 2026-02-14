@@ -100,3 +100,44 @@ func ExecFuncs(funcs []func() error, parallelism int, handling ErrorHandlingOpti
 
 	return errs
 }
+
+type Num interface {
+	~int | ~int8 | ~int16 | ~int32 | ~int64 |
+		~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 |
+		~float32 | ~float64
+}
+
+// SafeNum is a concurrency-safe struct that holds a numeric quantity
+type SafeNum[T Num] struct {
+	mu sync.RWMutex
+	v  T
+}
+
+// NewSafeNum creates concurrency safe number
+func NewSafeNum[T Num](initialQty T) *SafeNum[T] {
+	return &SafeNum[T]{
+		v: initialQty,
+	}
+}
+
+// Get returns the current quantity (read-lock)
+func (n *SafeNum[T]) Get() T {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	return n.v
+}
+
+// Set updates the value to a new value (write-lock)
+func (n *SafeNum[T]) Set(v T) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	n.v = v
+}
+
+// Add adds a delta to the current value (write-lock)
+func (n *SafeNum[T]) Add(delta T) T {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	n.v += delta
+	return n.v
+}

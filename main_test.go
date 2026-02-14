@@ -1056,3 +1056,249 @@ func TestXmlUnmarshal(t *testing.T) {
 
 	fmt.Printf("pretty: \n%v\n", pretty)
 }
+
+func TestSafeNum(t *testing.T) {
+	t.Run("NewSafeNum with all numeric types", func(t *testing.T) {
+		tests := []struct {
+			name    string
+			initial interface{}
+		}{
+			{"int", 42},
+			{"int8", int8(42)},
+			{"int16", int16(42)},
+			{"int32", int32(42)},
+			{"int64", int64(42)},
+			{"uint", uint(42)},
+			{"uint8", uint8(42)},
+			{"uint16", uint16(42)},
+			{"uint32", uint32(42)},
+			{"uint64", uint64(42)},
+			{"float32", float32(42.5)},
+			{"float64", float64(42.5)},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				switch v := tt.initial.(type) {
+				case int:
+					n := NewSafeNum(v)
+					if got := n.Get(); got != v {
+						t.Errorf("NewSafeNum() = %v, want %v", got, v)
+					}
+				case int8:
+					n := NewSafeNum(v)
+					if got := n.Get(); got != v {
+						t.Errorf("NewSafeNum() = %v, want %v", got, v)
+					}
+				case int16:
+					n := NewSafeNum(v)
+					if got := n.Get(); got != v {
+						t.Errorf("NewSafeNum() = %v, want %v", got, v)
+					}
+				case int32:
+					n := NewSafeNum(v)
+					if got := n.Get(); got != v {
+						t.Errorf("NewSafeNum() = %v, want %v", got, v)
+					}
+				case int64:
+					n := NewSafeNum(v)
+					if got := n.Get(); got != v {
+						t.Errorf("NewSafeNum() = %v, want %v", got, v)
+					}
+				case uint:
+					n := NewSafeNum(v)
+					if got := n.Get(); got != v {
+						t.Errorf("NewSafeNum() = %v, want %v", got, v)
+					}
+				case uint8:
+					n := NewSafeNum(v)
+					if got := n.Get(); got != v {
+						t.Errorf("NewSafeNum() = %v, want %v", got, v)
+					}
+				case uint16:
+					n := NewSafeNum(v)
+					if got := n.Get(); got != v {
+						t.Errorf("NewSafeNum() = %v, want %v", got, v)
+					}
+				case uint32:
+					n := NewSafeNum(v)
+					if got := n.Get(); got != v {
+						t.Errorf("NewSafeNum() = %v, want %v", got, v)
+					}
+				case uint64:
+					n := NewSafeNum(v)
+					if got := n.Get(); got != v {
+						t.Errorf("NewSafeNum() = %v, want %v", got, v)
+					}
+				case float32:
+					n := NewSafeNum(v)
+					if got := n.Get(); got != v {
+						t.Errorf("NewSafeNum() = %v, want %v", got, v)
+					}
+				case float64:
+					n := NewSafeNum(v)
+					if got := n.Get(); got != v {
+						t.Errorf("NewSafeNum() = %v, want %v", got, v)
+					}
+				}
+			})
+		}
+	})
+
+	t.Run("Get", func(t *testing.T) {
+		n := NewSafeNum(100)
+		if got := n.Get(); got != 100 {
+			t.Errorf("Get() = %v, want %v", got, 100)
+		}
+	})
+
+	t.Run("Set", func(t *testing.T) {
+		n := NewSafeNum(0)
+		n.Set(42)
+		if got := n.Get(); got != 42 {
+			t.Errorf("After Set(42), Get() = %v, want %v", got, 42)
+		}
+
+		n.Set(100)
+		if got := n.Get(); got != 100 {
+			t.Errorf("After Set(100), Get() = %v, want %v", got, 100)
+		}
+	})
+
+	t.Run("Add", func(t *testing.T) {
+		tests := []struct {
+			name    string
+			initial int
+			delta   int
+			want    int
+			wantRet int
+		}{
+			{"positive delta", 10, 5, 15, 15},
+			{"negative delta", 10, -3, 7, 7},
+			{"zero delta", 10, 0, 10, 10},
+			{"large delta", 100, 900, 1000, 1000},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				n := NewSafeNum(tt.initial)
+				got := n.Add(tt.delta)
+
+				if got != tt.wantRet {
+					t.Errorf("Add() returned %v, want %v", got, tt.wantRet)
+				}
+
+				if actual := n.Get(); actual != tt.want {
+					t.Errorf("After Add(), Get() = %v, want %v", actual, tt.want)
+				}
+			})
+		}
+	})
+
+	t.Run("Add with floats", func(t *testing.T) {
+		n := NewSafeNum(10.5)
+		got := n.Add(5.3)
+		want := 15.8
+
+		if got != want {
+			t.Errorf("Add() returned %v, want %v", got, want)
+		}
+
+		if actual := n.Get(); actual != want {
+			t.Errorf("After Add(), Get() = %v, want %v", actual, want)
+		}
+	})
+
+	t.Run("Concurrent reads", func(t *testing.T) {
+		n := NewSafeNum(42)
+		const numReaders = 100
+
+		var wg sync.WaitGroup
+		wg.Add(numReaders)
+
+		for i := 0; i < numReaders; i++ {
+			go func() {
+				defer wg.Done()
+				for j := 0; j < 1000; j++ {
+					if got := n.Get(); got != 42 {
+						t.Errorf("Concurrent Get() = %v, want 42", got)
+					}
+				}
+			}()
+		}
+
+		wg.Wait()
+	})
+
+	t.Run("Concurrent writes", func(t *testing.T) {
+		n := NewSafeNum(0)
+		const numWriters = 100
+		const iterations = 1000
+
+		var wg sync.WaitGroup
+		wg.Add(numWriters)
+
+		for i := 0; i < numWriters; i++ {
+			go func() {
+				defer wg.Done()
+				for j := 0; j < iterations; j++ {
+					n.Add(1)
+				}
+			}()
+		}
+
+		wg.Wait()
+
+		expected := numWriters * iterations
+		if got := n.Get(); got != expected {
+			t.Errorf("After concurrent Add(), Get() = %v, want %v", got, expected)
+		}
+	})
+
+	t.Run("Concurrent read and write", func(t *testing.T) {
+		n := NewSafeNum(0)
+		const numOps = 1000
+
+		var wg sync.WaitGroup
+		wg.Add(3)
+
+		// Writer 1: Add
+		go func() {
+			defer wg.Done()
+			for i := 0; i < numOps; i++ {
+				n.Add(1)
+			}
+		}()
+
+		// Writer 2: Set
+		go func() {
+			defer wg.Done()
+			for i := 0; i < numOps; i++ {
+				n.Set(i)
+			}
+		}()
+
+		// Reader
+		go func() {
+			defer wg.Done()
+			for i := 0; i < numOps; i++ {
+				_ = n.Get()
+			}
+		}()
+
+		wg.Wait()
+		// Just verify no race conditions occur - the final value is non-deterministic
+	})
+
+	t.Run("Zero value", func(t *testing.T) {
+		n := NewSafeNum(0)
+		if got := n.Get(); got != 0 {
+			t.Errorf("Zero value Get() = %v, want 0", got)
+		}
+
+		n.Add(5)
+		if got := n.Get(); got != 5 {
+			t.Errorf("After Add(5) from zero, Get() = %v, want 5", got)
+		}
+	})
+}
