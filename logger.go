@@ -60,8 +60,9 @@ var LogLevels = [...]LogLevel{TRACE, DEBUG, INFO, WARN, ERROR, FATAL}
 // LoggerSettings struct for storing the settings for the logger which are
 // used when printing the log to the console.
 type LoggerSettings struct {
-	Location   *time.Location
-	TimeFormat string
+	Location       *time.Location
+	TimeFormat     string
+	DisableConsole bool
 }
 
 const defaultTimeFormat = "2006-01-02 15:04:05"
@@ -222,6 +223,10 @@ func (lg *ConsoleLogger) Name() string { return "console" }
 func (lg *ConsoleLogger) GetTableName() string { return "" }
 
 func (lg *ConsoleLogger) Log(level LogLevel, msg string, lf ...LogFields) error {
+	if lg.Settings != nil && lg.Settings.DisableConsole {
+		return nil
+	}
+
 	log := NewLog(level, msg, lg.Source, lg.Event, lg.EventID, lf...)
 	_, err := fmt.Print(log.String(lg))
 	return err

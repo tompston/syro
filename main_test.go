@@ -87,6 +87,14 @@ func TestLogger(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
+
+		t.Run("disable-console", func(t *testing.T) {
+			logger := NewConsoleLogger(&LoggerSettings{
+				DisableConsole: true,
+			})
+
+			logger.Debug("this should not be shown")
+		})
 	})
 
 	t.Run("test-console-logger", func(t *testing.T) {
@@ -220,6 +228,7 @@ func TestMongoImpl(t *testing.T) {
 	if err := jobLogsColl.Drop(ctx); err != nil {
 		t.Fatal(err)
 	}
+
 	logger := NewMongoLogger(jobLogsColl, nil)
 
 	jobListColl := conn.Database(dbName).Collection("test_syro_cron")

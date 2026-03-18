@@ -93,7 +93,18 @@ func (lg *MongoLogger) Log(level LogLevel, msg string, lf ...LogFields) error {
 	}
 
 	_, err := lg.Coll.InsertOne(ctx, set)
-	fmt.Print(log.String(lg))
+
+	// Log only if the
+	// 	- settings are provided and console logging is not disabled
+	//  - settings are not provided (assumes that should log)
+	if lg.Settings != nil && !lg.Settings.DisableConsole {
+		fmt.Print(log.String(lg))
+	} else {
+		if lg.Settings == nil {
+			fmt.Print(log.String(lg))
+		}
+	}
+
 	return err
 }
 
