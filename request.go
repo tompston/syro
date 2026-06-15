@@ -65,6 +65,7 @@ type Response struct {
 	Body       []byte
 	StatusCode int
 	Duration   time.Duration
+	Raw        *http.Response
 }
 
 func NewRequest(method, url string) *Request {
@@ -162,7 +163,7 @@ func (r *Request) Do() (*Response, error) {
 		reqBody = r.Body
 	}
 
-	req, err := http.NewRequestWithContext(r.ctx, r.Method, url, bytes.NewBuffer(reqBody))
+	req, err := http.NewRequestWithContext(r.ctx, r.Method, url, bytes.NewReader(reqBody))
 	if err != nil {
 		return nil, err
 	}
@@ -192,6 +193,7 @@ func (r *Request) Do() (*Response, error) {
 		Body:       body,
 		Duration:   dur,
 		Request:    r,
+		// Raw:        res,
 	}
 
 	if r.ignoreStatusCodes {
@@ -206,10 +208,6 @@ func (r *Request) Do() (*Response, error) {
 		}
 
 		return _response, fmt.Errorf("response did not return status in 200 group while requesting %v, status: %v, body: %v", url, res.Status, bodyStr)
-	}
-
-	if body == nil {
-		return _response, fmt.Errorf("response returned empty body while requesting %v", url)
 	}
 
 	return _response, nil

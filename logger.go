@@ -72,7 +72,6 @@ const defaultTimeFormat = "2006-01-02 15:04:05"
 var LoggerSettingsDefault = &LoggerSettings{
 	Location:   time.UTC,
 	TimeFormat: defaultTimeFormat,
-	// TODO: optional disable for console?
 }
 
 type LogFilter struct {
