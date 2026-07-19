@@ -109,8 +109,8 @@ type Num interface {
 
 // SafeNum is a concurrency-safe struct that holds a numeric quantity
 type SafeNum[T Num] struct {
-	mu sync.RWMutex
 	v  T
+	mu sync.RWMutex
 }
 
 // NewSafeNum creates concurrency safe number

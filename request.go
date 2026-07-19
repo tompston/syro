@@ -49,35 +49,28 @@ func (c *HttpClient) Request(method, url string) *Request {
 }
 
 type Request struct {
-	ctx               context.Context
-	Headers           map[string]string
-	client            *http.Client // Optional custom HTTP client. If nil, default client will be used
-	errBodyLimit      *int         // Optional limit for the returned body size on error. If nil, no limit
-	Method            string
-	URL               string
-	Body              []byte
-	ignoreStatusCodes bool
+	ctx     context.Context
+	Headers map[string]string
+	client  *http.Client // Optional custom HTTP client. If nil, default client will be used
+	Method  string
+	URL     string
+	Body    []byte
 }
 
 type Response struct {
-	Request    *Request
-	Header     http.Header
-	Body       []byte
-	StatusCode int
-	Duration   time.Duration
-	Raw        *http.Response
+	Request  *Request
+	Raw      *http.Response
+	Body     []byte
+	Duration time.Duration
 }
 
 func NewRequest(method, url string) *Request {
-	defaultErrBodyLimit := 1000
-
 	return &Request{
-		Method:       method,
-		URL:          url,
-		Headers:      make(map[string]string),
-		client:       &http.Client{},
-		errBodyLimit: &defaultErrBodyLimit,
-		ctx:          ctx,
+		Method:  method,
+		URL:     url,
+		Headers: make(map[string]string),
+		client:  &http.Client{},
+		ctx:     ctx,
 	}
 }
 
@@ -115,12 +108,6 @@ func (r *Request) WithBasicAuth(username, password string) *Request {
 	return r
 }
 
-// WithErrorBodyLimit sets a limit for the error body size. If nil, no limit is applied.
-func (r *Request) WithErrorBodyLimit(limit *int) *Request {
-	r.errBodyLimit = limit
-	return r
-}
-
 func (r *Request) WithHeader(key, value string) *Request {
 	r.Headers[key] = value
 	return r
@@ -133,11 +120,6 @@ func (r *Request) WithJsonHeader() *Request {
 
 func (r *Request) WithBody(body []byte) *Request {
 	r.Body = body
-	return r
-}
-
-func (r *Request) WithIgnoreStatusCodes(ignore bool) *Request {
-	r.ignoreStatusCodes = ignore
 	return r
 }
 
@@ -172,6 +154,10 @@ func (r *Request) Do() (*Response, error) {
 		req.Header.Set(k, v)
 	}
 
+	if r.client == nil {
+		r.client = http.DefaultClient
+	}
+
 	now := time.Now()
 
 	res, err := r.client.Do(req)
@@ -188,29 +174,20 @@ func (r *Request) Do() (*Response, error) {
 	}
 
 	_response := &Response{
-		StatusCode: res.StatusCode,
-		Header:     res.Header,
-		Body:       body,
-		Duration:   dur,
-		Request:    r,
-		// Raw:        res,
-	}
-
-	if r.ignoreStatusCodes {
-		return _response, nil
-	}
-
-	if res.StatusCode != 200 && res.StatusCode != 201 && res.StatusCode != 202 {
-		bodyStr := ""
-		if body != nil && r.errBodyLimit != nil {
-			bodyUpTo := min(len(body), *r.errBodyLimit) // limit to x characters
-			bodyStr = string(body[:bodyUpTo])
-		}
-
-		return _response, fmt.Errorf("response did not return status in 200 group while requesting %v, status: %v, body: %v", url, res.Status, bodyStr)
+		Body:     body,
+		Raw:      res,
+		Duration: dur,
+		Request:  r,
 	}
 
 	return _response, nil
+}
+
+func (r *Response) IsOk() bool {
+	if r == nil || r.Raw == nil {
+		return false
+	}
+	return r.Raw.StatusCode >= 200 && r.Raw.StatusCode < 300
 }
 
 func (r *Request) AsCURL() string {
@@ -252,6 +229,10 @@ func (r *Request) AsCURL() string {
 
 func (r *Response) Summary() string {
 
+	if r == nil || r.Raw == nil {
+		return "<nil>"
+	}
+
 	var sb strings.Builder
 
 	// Request section
@@ -261,13 +242,13 @@ func (r *Response) Summary() string {
 
 	// Response section
 	sb.WriteString("───── RESPONSE ────────────────────────\n")
-	sb.WriteString(fmt.Sprintf("Status: %d\n", r.StatusCode))
+	sb.WriteString(fmt.Sprintf("Status: %d\n", r.Raw.StatusCode))
 	sb.WriteString(fmt.Sprintf("Duration: %v\n", r.Duration))
 
 	// Headers
-	if len(r.Header) > 0 {
+	if len(r.Raw.Header) > 0 {
 		sb.WriteString("\nHeaders:\n")
-		for key, values := range r.Header {
+		for key, values := range r.Raw.Header {
 			sb.WriteString(fmt.Sprintf("  %s: %s\n", key, strings.Join(values, ", ")))
 		}
 	}
@@ -302,7 +283,7 @@ func (r *Response) formatBody() string {
 	}
 
 	// Check Content-Type header first
-	contentType := r.Header.Get("Content-Type")
+	contentType := r.Raw.Header.Get("Content-Type")
 
 	// Try JSON - check header or content structure
 	if strings.Contains(contentType, "application/json") ||

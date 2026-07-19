@@ -131,6 +131,10 @@ func main() {
 		log.Fatal(err)
 	}
 
+	if !res.IsOk() {
+		log.Fatal("did not recieve an ok status code")
+	}
+
 	fmt.Printf("%v\n", res.Summary())
 }
 

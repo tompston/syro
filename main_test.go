@@ -664,18 +664,14 @@ func TestRequest(t *testing.T) {
 	})
 
 	t.Run("with-ignore-status-codes", func(t *testing.T) {
-		req := NewRequest("GET", "http://example.com").WithIgnoreStatusCodes(true)
-		if !req.ignoreStatusCodes {
-			t.Error("expected IgnoreStatusCodes to be true")
-		}
 
-		res, err := req.Do()
+		res, err := NewRequest("GET", "http://example.com").Do()
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
-		if res.StatusCode != 200 {
-			t.Errorf("expected status code 200, got %d", res.StatusCode)
+		if res.Raw.StatusCode != 200 {
+			t.Errorf("expected status code 200, got %d", res.Raw.StatusCode)
 		}
 
 		fmt.Printf("res.Body: %v\n", string(res.Body))
@@ -713,8 +709,8 @@ func TestRequest(t *testing.T) {
 			t.Errorf("unexpected body: %s", res.Body)
 		}
 
-		if res.StatusCode != http.StatusOK {
-			t.Errorf("expected status code 200, got %d", res.StatusCode)
+		if res.Raw.StatusCode != http.StatusOK {
+			t.Errorf("expected status code 200, got %d", res.Raw.StatusCode)
 		}
 	})
 
@@ -724,11 +720,18 @@ func TestRequest(t *testing.T) {
 		}))
 		defer server.Close()
 
-		req := NewRequest("GET", server.URL)
+		res, err := NewRequest("GET", server.URL).Do()
+		if err != nil {
+			t.Fatal(err)
+		}
 
-		_, err := req.Do()
-		if err == nil || !contains(err.Error(), "status: 418") {
-			t.Errorf("expected status error, got: %v", err)
+		isOk := res.IsOk()
+		if isOk {
+			t.Fatalf("expected for IsOk() to be false, when the handler returns 418 responses")
+		}
+
+		if res.Raw.StatusCode != 418 {
+			t.Errorf("expected status 418, got: %v", res.Raw.StatusCode)
 		}
 	})
 }
@@ -778,10 +781,6 @@ func TestRequestsWithMockServer(t *testing.T) {
 
 		fmt.Printf("%v\n", res.Summary())
 	})
-}
-
-func contains(s, substr string) bool {
-	return bytes.Contains([]byte(s), []byte(substr))
 }
 
 func TestExecFuncs(t *testing.T) {
