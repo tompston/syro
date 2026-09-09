@@ -15,36 +15,43 @@ import (
 	"time"
 )
 
-type HttpClient struct {
+// TODO: retry logic?
+// TODO: save directory?
+type Fetcher struct {
 	client *http.Client
 }
 
 // Make http requests with the client reused
-func NewHttpClient(c *http.Client) *HttpClient {
+func NewFetcher() *Fetcher {
+	return &Fetcher{client: http.DefaultClient}
+}
+
+func (f *Fetcher) WithClient(c *http.Client) *Fetcher {
 	if c == nil {
 		c = http.DefaultClient
 	}
-	return &HttpClient{c}
+
+	f.client = c
+
+	return f
 }
 
-func (c *HttpClient) Client() *http.Client {
-	return c.client
-}
+func (f *Fetcher) Client() *http.Client { return f.client }
 
-func (c *HttpClient) Transport() *http.Transport {
+func (c *Fetcher) Transport() *http.Transport {
 	if tr, ok := c.client.Transport.(*http.Transport); ok {
 		return tr
 	}
 	return http.DefaultTransport.(*http.Transport)
 }
 
-func (c *HttpClient) Request(method, url string) *Request {
+func (f *Fetcher) Request(method, url string) *Request {
 	return &Request{
 		Method:  method,
 		URL:     url,
 		Headers: map[string]string{},
-		client:  c.client,
-		ctx:     ctx,
+		client:  f.client,
+		ctx:     context.Background(),
 	}
 }
 
@@ -69,8 +76,8 @@ func NewRequest(method, url string) *Request {
 		Method:  method,
 		URL:     url,
 		Headers: make(map[string]string),
-		client:  &http.Client{},
-		ctx:     ctx,
+		client:  http.DefaultClient,
+		ctx:     context.Background(),
 	}
 }
 
@@ -113,7 +120,7 @@ func (r *Request) WithHeader(key, value string) *Request {
 	return r
 }
 
-func (r *Request) WithJsonHeader() *Request {
+func (r *Request) WithJSONContentType() *Request {
 	r.Headers["Content-Type"] = "application/json"
 	return r
 }
@@ -154,15 +161,16 @@ func (r *Request) Do() (*Response, error) {
 		req.Header.Set(k, v)
 	}
 
-	if r.client == nil {
-		r.client = http.DefaultClient
+	client := r.client
+	if client == nil {
+		client = http.DefaultClient
 	}
 
 	now := time.Now()
 
-	res, err := r.client.Do(req)
+	res, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("error fetching %v : %v", url, err)
+		return nil, fmt.Errorf("error fetching %v : %w", url, err)
 	}
 	defer res.Body.Close()
 
@@ -170,7 +178,7 @@ func (r *Request) Do() (*Response, error) {
 
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		return nil, fmt.Errorf("error reading response body when fetching %v, status %v: error: %v", url, res.Status, err)
+		return nil, fmt.Errorf("error reading response body when fetching %v, status %v: error: %w", url, res.Status, err)
 	}
 
 	_response := &Response{

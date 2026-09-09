@@ -4,45 +4,45 @@ import (
 	"strings"
 )
 
-// ErrGroup is a helper struct for cases when a single function
+// Errors is a helper struct for cases when a single function
 // could have multiple errors which should be accumulated,
 // instead of returning the first one.
 // TODO: add safety for concurrency
-type ErrGroup struct {
+type Errors struct {
 	ID          string
 	errors      []error
 	withNewline bool
 }
 
-func NewErrGroup() *ErrGroup {
-	return &ErrGroup{
+func NewErrors() *Errors {
+	return &Errors{
 		errors:      make([]error, 0),
 		withNewline: false,
 		ID:          "",
 	}
 }
 
-func (eg *ErrGroup) WithID(id string) *ErrGroup {
+func (eg *Errors) WithID(id string) *Errors {
 	if eg != nil {
 		eg.ID = id
 	}
 	return eg
 }
 
-func (eg *ErrGroup) WithNewline(v bool) *ErrGroup {
+func (eg *Errors) WithNewline(v bool) *Errors {
 	if eg != nil {
 		eg.withNewline = v
 	}
 	return eg
 }
 
-func (eg *ErrGroup) Add(err error) {
+func (eg *Errors) Add(err error) {
 	if eg != nil && err != nil {
 		eg.errors = append(eg.errors, err)
 	}
 }
 
-func (eg *ErrGroup) Errors() []error {
+func (eg *Errors) Errors() []error {
 	if eg != nil {
 		return eg.errors
 	}
@@ -51,10 +51,10 @@ func (eg *ErrGroup) Errors() []error {
 }
 
 // Error implements the error interface. It returns a concatenated string of all
-// non-nil ErrGroup, each separated by a semicolon.
+// non-nil Errors, each separated by a semicolon.
 //
 // TODO: write tests for this method
-func (eg *ErrGroup) Error() string {
+func (eg *Errors) Error() string {
 	if eg == nil {
 		return ""
 	}
@@ -87,7 +87,7 @@ func (eg *ErrGroup) Error() string {
 	return sb.String()
 }
 
-func (eg *ErrGroup) Len() int {
+func (eg *Errors) Len() int {
 	if eg == nil {
 		return 0
 	}
@@ -96,8 +96,8 @@ func (eg *ErrGroup) Len() int {
 }
 
 // Return the error only if at least one of them happened. This is done because
-// the ErrGroup is not nil when created, but it may be empty.
-func (eg *ErrGroup) ToErr() error {
+// the Errors is not nil when created, but it may be empty.
+func (eg *Errors) ToErr() error {
 	if eg == nil {
 		return nil
 	}

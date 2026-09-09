@@ -3,6 +3,7 @@ package syro
 import (
 	"archive/zip"
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -137,7 +138,7 @@ func TestLogger(t *testing.T) {
 
 func TestErrGroup(t *testing.T) {
 	t.Run("test-new-errgroup", func(t *testing.T) {
-		eg := NewErrGroup()
+		eg := NewErrors()
 		if eg == nil {
 			t.Fatal("New() should not return nil")
 		}
@@ -148,7 +149,7 @@ func TestErrGroup(t *testing.T) {
 	})
 
 	t.Run("test-add-error", func(t *testing.T) {
-		eg := NewErrGroup()
+		eg := NewErrors()
 		err1 := errors.New("first error")
 		err2 := errors.New("second error")
 
@@ -169,7 +170,7 @@ func TestErrGroup(t *testing.T) {
 	})
 
 	t.Run("test-errors", func(t *testing.T) {
-		eg := NewErrGroup()
+		eg := NewErrors()
 
 		eg.Add(errors.New("first error"))
 		eg.Add(errors.New("second error"))
@@ -179,14 +180,14 @@ func TestErrGroup(t *testing.T) {
 			t.Fatalf("Error() returned %q, want %q", eg.Error(), expected)
 		}
 
-		eg = NewErrGroup() // test with no errors
+		eg = NewErrors() // test with no errors
 		if eg.Error() != "" {
 			t.Fatalf("Error() should return an empty string for an empty ErrGroup, got %q", eg.Error())
 		}
 	})
 
 	t.Run("test-len", func(t *testing.T) {
-		eg := NewErrGroup()
+		eg := NewErrors()
 		if eg.Len() != 0 {
 			t.Fatalf("Len() should return 0 for a new ErrGroup, got %d", eg.Len())
 		}
@@ -1309,4 +1310,45 @@ func TestSafeNum(t *testing.T) {
 			t.Errorf("After Add(5) from zero, Get() = %v, want 5", got)
 		}
 	})
+}
+
+func TestRequest_WithCtx_CancelsRequest(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Deliberately take longer than the client's context deadline.
+		time.Sleep(500 * time.Millisecond)
+
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("this should never be received"))
+	}))
+	defer server.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	client := NewFetcher()
+
+	start := time.Now()
+
+	_, err := client.
+		Request(http.MethodGet, server.URL).
+		WithCtx(ctx).
+		Do()
+
+	duration := time.Since(start)
+
+	if err == nil {
+		t.Fatal("expected request to fail due to context cancellation")
+	}
+
+	fmt.Printf("TestRequest_WithCtx_CancelsRequest : err.Error(): %v\n", err.Error())
+
+	// Make sure it actually failed because of the context.
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("expected context.DeadlineExceeded, got: %v", err)
+	}
+
+	// Sanity check that we didn't actually wait for the server's 500ms sleep.
+	if duration >= 400*time.Millisecond {
+		t.Fatalf("request took too long: %v", duration)
+	}
 }

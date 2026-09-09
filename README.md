@@ -118,13 +118,13 @@ The CronScheduler has a method called `WithExecLogger` that can be optionally us
 
 ### Http Requests
 
-You can build requests with the `syro.NewRequest()` function. It has multiple methods that can be used to further extend the request data. The `NewRequest()` function can be used in standalone, or called as a method from `NewHttpClient` for a reusable client.
+You can build requests with the `syro.NewFetcher()` function. It has multiple methods that can be used to further extend the request data. The `NewFetcher()` function can be used in standalone, or called as a method from `NewFetcher()` for a reusable client.
 
 #### Example
 
 ```go
 func main() {
-	client := syro.NewHttpClient(nil)
+	client := syro.NewFetcher(nil)
 
 	res, err := client.Request("GET", "https://httpbin.org/get").Do()
 	if err != nil {
