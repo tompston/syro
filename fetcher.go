@@ -138,13 +138,12 @@ func (r *Request) WithClient(c *http.Client) *Request {
 func (r *Request) Do() (*Response, error) {
 
 	url := r.URL
+	if url == "" {
+		return nil, fmt.Errorf("request URL is not set")
+	}
 
 	if r.Method == "" {
 		return nil, fmt.Errorf("request method is not set")
-	}
-
-	if url == "" {
-		return nil, fmt.Errorf("request URL is not set")
 	}
 
 	var reqBody []byte
