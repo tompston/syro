@@ -1,12 +1,10 @@
 # syro
 
-Aka a bunch or util things that can be used between projects. Can be seen as an opinionated extension of
-
-> NOTE: there is 0 obligation from my side that the exposed api will not change in the future. At least not ini the beginging
+Aka a bunch or util things that can be used between projects.
 
 This includes
 
-- structured logging, based around interfaces (with implementation for console and mongodb logger)
+- structured logging, based around interfaces (with implementation for console logger)
 - wrapper around `robfig/cron/v3` cron job scheduler with
   - locked execution (next cron won't trigger if previous has not finished)
   - optional `OnComplete` callback when the function executes
@@ -19,6 +17,8 @@ This includes
 - util for executing functions concurrently
   - can set how many of them can run concurrently
   - can define how they should execute (return on first error, collect all errors etc etc)
+
+> NOTE: there is 0 obligation from my side that the exposed api will not change in the future.
 
 ### Logger
 
@@ -124,7 +124,7 @@ You can build requests with the `syro.NewFetcher()` function. It has multiple me
 
 ```go
 func main() {
-	client := syro.NewFetcher(nil)
+	client := syro.NewFetcher()
 
 	res, err := client.Request("GET", "https://httpbin.org/get").Do()
 	if err != nil {
@@ -182,15 +182,14 @@ Body:
   ```
 
 - the logger is based around interfaces that have GetX and FindX type of methods, which can be used to retrieve the logs from the database. Simple queries can be done in this way, but once you need complex queries for the logs, then the interface methods are not quite the best approach.
-- This package does come with a dependency for `go.mongodb.org/mongo-driver`, as there is an implementation for the logger and cron job storage interface with it. The correct way would be to split this into two seperate packages, but an overkill of complexity at the start.
-- yes, syro is a reference to the aphex twin album
+- yes, syro is a reference to that aphex twin album
 
-### TODO
+### Commands
 
-- [ ] frontend
-  - [ ] settings grid for api urls (logs, crons)
-    - [ ] store settings in localstorage
-  - [ ] hosting the static site as an embedded file
+```bash
+# tests
+go test ./... -count=1 -p 12
+```
 
 <!--
 
