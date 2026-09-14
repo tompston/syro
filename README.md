@@ -211,4 +211,15 @@ betteralign -apply ./...
 // qwe
 // qwe
 
+
+
+## Creating a package
+
+go mod init github.com/tompston/syro
+
+git add .
+git commit -m "syro: first release"
+git tag v0.0.1
+git push origin v0.0.1
+
  -->
