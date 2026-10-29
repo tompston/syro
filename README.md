@@ -222,6 +222,6 @@ git commit -m "syro: next release"
 git tag v0.0.2
 git push origin v0.0.2
 
-// qwe qwe
+// qwe
 
  -->
