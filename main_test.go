@@ -980,3 +980,17 @@ func TestRequest_WithCtx_CancelsRequest(t *testing.T) {
 		t.Fatalf("request took too long: %v", duration)
 	}
 }
+
+func TestWithDoesNotMutateParent(t *testing.T) {
+	base := NewConsoleLogger(nil)
+
+	derived := base.WithSource("pooler").WithEvent("binance").WithEventID("42")
+
+	if p := base.GetProps(); p.Source != "" || p.Event != "" || p.EventID != "" {
+		t.Fatalf("base logger was mutated: %+v", p)
+	}
+
+	if p := derived.GetProps(); p.Source != "pooler" || p.Event != "binance" || p.EventID != "42" {
+		t.Fatalf("derived logger has wrong props: %+v", p)
+	}
+}

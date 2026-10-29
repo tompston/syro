@@ -218,10 +218,10 @@ betteralign -apply ./...
 go mod init github.com/tompston/syro
 
 git add .
-git commit -m "syro: first release"
-git tag v0.0.1
-git push origin v0.0.1
+git commit -m "syro: next release"
+git tag v0.0.2
+git push origin v0.0.2
 
-// qwe
+// qwe qwe
 
  -->

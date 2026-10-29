@@ -229,18 +229,21 @@ func (lg *ConsoleLogger) Log(level LogLevel, msg string, lf ...LogFields) error 
 }
 
 func (lg *ConsoleLogger) WithSource(v string) Logger {
-	lg.Source = v
-	return lg
+	c := *lg
+	c.Source = v
+	return &c
 }
 
 func (lg *ConsoleLogger) WithEvent(v string) Logger {
-	lg.Event = v
-	return lg
+	c := *lg
+	c.Event = v
+	return &c
 }
 
 func (lg *ConsoleLogger) WithEventID(v string) Logger {
-	lg.EventID = v
-	return lg
+	c := *lg
+	c.EventID = v
+	return &c
 }
 
 func (lg *ConsoleLogger) Debug(msg string, lf ...LogFields) error { return lg.Log(DEBUG, msg, lf...) }
